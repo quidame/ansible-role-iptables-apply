@@ -1,4 +1,4 @@
-iptables-apply
+iptables_apply
 ==============
 
 Setup the firewall with a core iptables ruleset and application-specific rules
@@ -42,7 +42,7 @@ Example Playbook
 ```yaml
 - hosts: servers
   roles:
-    - role: iptables-apply
+    - role: iptables_apply
 ```
 
 License
