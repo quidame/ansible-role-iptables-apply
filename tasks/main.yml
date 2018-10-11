@@ -1,7 +1,10 @@
 ---
-- name: fail if paramiko is in use
-  when: "ansible_connection == 'paramiko'"
-  fail:
+# In the last task, we will switch connection plugin to be sute to not reuse
+# a previous connection.
+- name: get current connection plugin
+  set_fact:
+    initial_connection: "{{ ansible_connection }}"
+  failed_when: "ansible_connection not in ['paramiko','ssh']"
 
 
 # It will be used in case of rollback
@@ -51,7 +54,7 @@
   with_items:
     - absent
     - touch
-  # By using paramiko, we are sure a new connection is initialized, i.e. we
-  # don't reuse a control socket from a previous task.
-  connection: paramiko
+  # By switching connection plugin, we are sure a new connection is initialized,
+  # i.e. we don't reuse a control socket from a previous task.
+  connection: "{{ 'paramiko' if initial_connection == 'ssh' else 'ssh' }}"
 
