@@ -1,0 +1,27 @@
+---
+################################################################################
+# iptables_apply__noflush
+#
+# If `True`, current iptables ruleset is not flushed.
+#
+iptables_apply__noflush: false
+
+
+################################################################################
+# iptables_apply__template
+#
+# Path of a template file that once evaluated is used as input for the command
+# `iptables-restore`.
+#
+iptables_apply__template: "iptables.j2"
+
+
+################################################################################
+# iptables_apply__timeout
+#
+# The delay, in seconds, after what the initial iptables ruleset is restored if
+# the confirmation file is missing.
+#
+iptables_apply__timeout: 20
+
+
