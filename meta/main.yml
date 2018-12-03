@@ -1,6 +1,7 @@
+---
 galaxy_info:
   author: quidame <quidame@poivron.org>
-  description: your description
+  description: apply iptables ruleset with rollback feature
 
   license: GPLv3+
 
