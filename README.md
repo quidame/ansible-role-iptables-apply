@@ -20,7 +20,7 @@ If `True`, current iptables ruleset is not flushed and rules from the template
 are inserted.
 
 ```yaml
-iptables_apply__template: "iptables.j2"
+iptables_apply__template: "iptables_apply.j2"
 ```
 This defines the path of a template file that once evaluated is used as input
 for the command `iptables-restore`.

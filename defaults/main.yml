@@ -13,7 +13,7 @@ iptables_apply__noflush: false
 # Path of a template file that once evaluated is used as input for the command
 # `iptables-restore`.
 #
-iptables_apply__template: "iptables.j2"
+iptables_apply__template: "iptables_apply.j2"
 
 
 ################################################################################
