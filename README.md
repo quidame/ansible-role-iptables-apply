@@ -1,6 +1,18 @@
 iptables_apply
 ==============
 
+- [Description](#description)
+- [Requirements](#requirements)
+- [Role Variables](#role-variables)
+- [Dependencies](#dependencies)
+- [Example Playbook](#example-playbook)
+- [License](#license)
+- [Author Information](#author-information)
+
+
+Description
+-----------
+
 Setup the firewall with a core iptables ruleset and application-specific rules
 that will replace the current setup. A rollback feature ensures you will not be
 locked out the target host.
