@@ -73,10 +73,22 @@ None.
 Example Playbook
 ----------------
 
+Apply the core ruleset, ensuring a secure base setup with ssh access allowed
+and no more.
+
 ```yaml
 - hosts: servers
   roles:
     - role: iptables_apply
+```
+
+Apply the same ruleset on an already configured firewall you want to keep.
+
+```yaml
+- hosts: servers
+  roles:
+    - role: iptables_apply
+      iptables_apply__noflush: yes
 ```
 
 Galaxy
