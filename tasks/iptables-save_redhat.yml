@@ -1,0 +1,3 @@
+---
+- name: confirm applied ruleset as persistent
+  command: service iptables save

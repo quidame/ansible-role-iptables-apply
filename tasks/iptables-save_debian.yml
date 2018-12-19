@@ -1,0 +1,3 @@
+---
+- name: confirm applied ruleset as persistent
+  command: netfilter-persistent save

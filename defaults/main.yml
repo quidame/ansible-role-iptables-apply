@@ -8,6 +8,15 @@ iptables_apply__noflush: false
 
 
 ################################################################################
+# iptables_apply__save_state
+#
+# Whether or not to make the currently applied ruleset persistent across
+# reboots. Default is `yes`.
+#
+iptables_apply__save_state: true
+
+
+################################################################################
 # iptables_apply__template
 #
 # Path of a template file that once evaluated is used as input for the command
@@ -23,5 +32,4 @@ iptables_apply__template: "iptables_apply.j2"
 # the confirmation file is missing.
 #
 iptables_apply__timeout: 20
-
 

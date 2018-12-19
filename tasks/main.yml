@@ -58,3 +58,9 @@
   # i.e. we don't reuse a control socket from a previous task.
   connection: "{{ 'paramiko' if initial_connection == 'ssh' else 'ssh' }}"
 
+
+# Save applied ruleset so it will be applied again after reboot.
+- name: confirm applied ruleset as persistent
+  include_tasks: "iptables-save_{{ ansible_os_family|lower }}.yml"
+  when: iptables_apply__save_state|bool == True
+
