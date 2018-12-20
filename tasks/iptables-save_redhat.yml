@@ -1,3 +1,11 @@
 ---
 - name: confirm applied ruleset as persistent
   command: service iptables save
+  args:
+    warn: no
+
+- name: enable and start service
+  systemd:
+    name: iptables
+    enabled: yes
+    state: started

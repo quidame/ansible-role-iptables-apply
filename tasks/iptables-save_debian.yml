@@ -1,3 +1,16 @@
 ---
+- name: install iptables-persistent
+  apt:
+    name: iptables-persistent
+    state: present
+
 - name: confirm applied ruleset as persistent
-  command: netfilter-persistent save
+  command: service netfilter-persistent save
+  args:
+    warn: no
+
+- name: enable and start service
+  systemd:
+    name: netfilter-persistent
+    enabled: yes
+    state: started
