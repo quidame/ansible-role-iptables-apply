@@ -1,7 +1,7 @@
 ---
 # First ensure the resulting file is in good shape when making it available on
 # the remote host
-- name: build iptables ruleset to be applied
+- name: rewrite iptables ruleset from scratch
   template:
     src: "{{ iptables_apply__template }}"
     dest: "{{ iptables_apply__path_buffer }}"
