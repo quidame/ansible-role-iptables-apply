@@ -66,7 +66,42 @@ iptables_apply__rules: []
 # Path of a template file that once evaluated is used as input for the command
 # `iptables-restore`.
 #
-iptables_apply__template: "iptables_apply.j2"
+iptables_apply__template: iptables_apply.j2
+
+
+################################################################################
+# iptables_apply__template_core
+#
+# Whether or not to apply the core ruleset provided by the template. The core
+# rules, a.k.a. sanity rules, are inserted to ensure they will be evaluated
+# first even if `iptables_apply__noflush` is True. Defaults to `true`.
+#
+iptables_apply__template_core: true
+
+
+################################################################################
+# iptables_apply__template_policy
+#
+# The default policy to apply for each chain of the filter table. If a policy
+# is undefined in this variable, then it will not be changed on the target. For
+# example, to keep all current policies (useful with 'iptables_apply__noflush'
+# set to 'True'):
+# iptables_apply__template_policy: {}
+#
+iptables_apply__template_policy:
+  input: DROP
+  forward: DROP
+  output: ACCEPT
+
+
+################################################################################
+# iptables_apply__template_rules
+#
+# The iptables rules to apply in addition to the sanity ruleset provided by
+# the template. This is a list of dictionnaries accepting the same keys than
+# `iptables_apply__rules` and defaults to the same value.
+#
+iptables_apply__template_rules: "{{ iptables_apply__rules }}"
 
 
 ################################################################################
