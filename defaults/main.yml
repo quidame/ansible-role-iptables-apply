@@ -29,6 +29,38 @@ iptables_apply__persist: true
 
 
 ################################################################################
+# iptables_apply__rules
+#
+# The iptables rules to apply in addition to the sanity ruleset provided by
+# the template. This is a list of dictionnaries accepting the following keys:
+# * name
+#   Mandatory. String. Used as the rule's comment
+# * chain
+#   One of INPUT, FORWARD or OUTPUT. Defaults to INPUT.
+# * protocol
+#   One of 'tcp' or 'udp'. Defaults to 'tcp'.
+# * dport
+#   Mandatory. May be a port number, a port range, or a comma-separated list of
+#   port numbers and/or port ranges (e.g. '12000:12999,54321')
+# * jump
+#   One of ACCEPT, DROP or REJECT. Defaults to ACCEPT.
+#
+# Example:
+# iptables_apply__rules:
+#   - name: PostgreSQL
+#     dport: 5432
+#   - name: Knot DNS
+#     dport: 53,953
+#     protocol: udp
+#
+# Will be templated as:
+# -A INPUT -p tcp -m tcp --dport 5432 -m comment --comment PostgreSQL -j ACCEPT
+# -A INPUT -p udp -m multiport --dports 53,953 -m comment --comment "Knot DNS" -j ACCEPT
+#
+iptables_apply__rules: []
+
+
+################################################################################
 # iptables_apply__template
 #
 # Path of a template file that once evaluated is used as input for the command
