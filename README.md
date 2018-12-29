@@ -10,6 +10,7 @@ host.
 - [Description](#description)
 - [Requirements](#requirements)
 - [Role Variables](#role-variables)
+- [Template Variables](#template-variables)
 - [Dependencies](#dependencies)
 - [Example Playbook](#example-playbook)
 - [Galaxy](#galaxy)
@@ -62,14 +63,7 @@ iptables_apply__noflush: false
   reboots.
 
 ```yaml
-iptables_apply__save_state: true
-```
-
-* This defines the path of a template file that once evaluated is used as input
-  for the command `iptables-restore`.
-
-```yaml
-iptables_apply__template: "iptables_apply.j2"
+iptables_apply__persist: true
 ```
 
 * This defines the delay, in seconds, after what the initial iptables ruleset
@@ -77,6 +71,48 @@ iptables_apply__template: "iptables_apply.j2"
 
 ```yaml
 iptables_apply__timeout: 20
+```
+
+Template Variables
+------------------
+
+The following variables refer to the template that comes with the role.  They
+make sense as long as `iptables_apply__action`'s value is `template`.
+
+* This defines the path of a template file that once evaluated is used as input
+  for the command `iptables-restore`.  Defaults to the template shipped with
+  the role.
+
+```yaml
+iptables_apply__template: iptables_apply.j2
+```
+
+* Whether or not to apply the core ruleset provided by the template. The core
+  rules, a.k.a. sanity rules, are inserted to ensure they will be evaluated
+  first even if `iptables_apply__noflush` is true.  Defaults to `true`.
+
+```yaml
+iptables_apply__template_core: true
+```
+
+* The default policy to apply for each chain of the filter table.  If a policy
+  is undefined in this variable, then it will not be changed on the target. For
+  example, to keep all current policies (useful with `iptables_apply__noflush`
+  set to `True`): `iptables_apply__template_policy: {}`
+
+```yaml
+iptables_apply__template_policy:
+  input: DROP
+  forward: DROP
+  output: ACCEPT
+```
+
+* The iptables rules to apply in addition to the sanity rules provided by the
+  template.  This is a list of dictionnaries with the same keys than
+  `iptables_apply__rules`, and defaults to the same value.
+
+```yaml
+iptables_apply__template_rules: "{{ iptables_apply__rules }}"
 ```
 
 Dependencies
