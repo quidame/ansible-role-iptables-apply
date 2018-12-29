@@ -22,9 +22,11 @@
   include_tasks: "iptables-{{ iptables_apply__action }}.yml"
 
 
-# Actually apply the ruleset and try to confirm it.
+# Actually apply the ruleset and try to confirm it. The conditional is for
+# idempotency.
 - name: apply iptables ruleset
   include_tasks: iptables-apply.yml
+  when: iptables_ruleset is changed
 
 
 # Save applied ruleset so it will be applied again after reboot.

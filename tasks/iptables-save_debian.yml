@@ -8,6 +8,7 @@
   command: service netfilter-persistent save
   args:
     warn: no
+  when: iptables_ruleset is changed
 
 - name: enable and start service
   systemd:

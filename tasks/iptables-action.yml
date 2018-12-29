@@ -37,3 +37,4 @@
   loop: "{{ iptables_apply__rules }}"
   loop_control:
     loop_var: rule
+  register: iptables_ruleset
