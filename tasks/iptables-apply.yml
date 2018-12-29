@@ -13,6 +13,7 @@
         sleep 1; i=$((i+1))
         test -e {{ iptables_apply__path_cookie }} && exit 0
       done
+      rm -f {{ iptables_apply__path_buffer }}
       iptables-restore {{ iptables_apply__path_backup }} &&
       touch {{ iptables_apply__path_cookie }}
     ) &
