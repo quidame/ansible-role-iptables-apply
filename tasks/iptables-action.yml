@@ -1,0 +1,39 @@
+---
+# The regexp being the same, a same task may be used to `append`, `insert` or
+# `delete` rules.
+
+- name: "{{ iptables_apply__action }}{{ '' if iptables_apply__action == 'delete' else '/update' }} rules in current ruleset"
+  lineinfile:
+    # Do not perform action directly upon the system file nor the system state
+    path: "{{ iptables_apply__path_buffer }}"
+    # The following regexp catches rules matching either the `dport` or the
+    # `name` values, making easy to never 'duplicate' a rule nor keep obsolete
+    # rules as long as we don't modify `name` and `dport` at the same time.
+    # This is also the way to actually **update** a rule, by modifying its
+    # destination port(s) OR its comment, all other parameters remaining
+    # unchanged.
+    regexp: "^(-A {{
+      rule.chain|default('INPUT') }} -p {{
+      rule.protocol|default('tcp') }} -m (multiport|{{
+      rule.protocol|default('tcp') }}) --dports? (({{
+      rule.dport }} -m comment --comment .*)|(.* -m comment --comment (\"?){{
+      rule.name }}\\6)) -j {{
+      rule.jump|default('ACCEPT') }})$"
+    # The build `rule.name|wordcount` allows our task to mimic iptables command
+    # behaviour regarding double quotes enclosure.  It's a good approximation,
+    # but fails idempotency for names such as `foo-bar`, since `-` is a word
+    # separator.
+    line: "-A {{
+      rule.chain|default('INPUT') }} -p {{
+      rule.protocol|default('tcp') }} -m {{
+      'multiport --dports %s' % rule.dport if ',' in rule.dport|string else
+      '%s --dport %s' % (rule.protocol|default('tcp'), rule.dport) }} -m comment --comment {{
+      rule.name|regex_replace('^|$', '\"') if rule.name|wordcount != 1 else rule.name }} -j {{
+      rule.jump|default('ACCEPT') }}"
+    state: "{{ 'absent' if iptables_apply__action == 'delete' else 'present' }}"
+    insertafter: "{{ '^:OUTPUT' if iptables_apply__action == 'insert' else omit }}"
+    insertbefore: "{{ '^COMMIT' if iptables_apply__action == 'append' else omit }}"
+    validate: "iptables-restore --test %s"
+  loop: "{{ iptables_apply__rules }}"
+  loop_control:
+    loop_var: rule
