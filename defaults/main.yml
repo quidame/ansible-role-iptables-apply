@@ -14,7 +14,9 @@ iptables_apply__action: template
 ################################################################################
 # iptables_apply__noflush
 #
-# If `True`, current iptables ruleset is not flushed.
+# If `True`, current iptables rules are not flushed, and so they'll still be
+# applied to packets not matching any rule from the template.  Default is
+# `false`
 #
 iptables_apply__noflush: false
 
