@@ -1,0 +1,5 @@
+---
+# Internals
+iptables_apply__path_backup: /run/iptables.backup
+iptables_apply__path_buffer: /run/iptables.buffer
+iptables_apply__path_cookie: /run/iptables.cookie
