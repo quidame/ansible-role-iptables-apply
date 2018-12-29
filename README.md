@@ -1,8 +1,9 @@
 iptables_apply
 ==============
 
-Setup iptables firewall from a template. A rollback feature ensures the Ansible
-Controller will not be locked out the target host.
+Setup iptables firewall from scratch or on a per-rule basis.  A rollback
+feature ensures the Ansible Controller will not be locked out of the target
+host.
 
 **SUMMARY**
 
@@ -20,10 +21,23 @@ Description
 -----------
 
 This role populates target's iptables ruleset from a template, also flushing
-(the default) or keeping existing rules. If the next task fails, meaning that
-the target is not reachable anymore, the firewall is restarted with its initial
+(the default) or keeping existing rules; or modifies current ruleset by adding
+or removing service-specific rules.  If the next task fails, meaning that the
+target is not reachable anymore, the firewall is restarted with its initial
 configuration, so the ansible controller, at least, is not locked out of its
 target.
+
+This role comes with the following features:
+
+- rollback in case of failure
+- full firewall configuration from scratch
+- blind firewall sanitization by inserting a core of sanity rules  *before*
+  the current ones, that remain unchanged but may as well never be reached
+  anymore.
+- per-rule firewall management, allowing other roles to add or remove rules
+  when installing or uninstalling services respectively.
+- easy-to-write rules, with a list of dictionnaries with only two mandatory
+  parameters.
 
 Requirements
 ------------
