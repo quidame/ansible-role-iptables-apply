@@ -49,11 +49,46 @@ role doesn't work in *Cygwin* environment.
 Role Variables
 --------------
 
-Only a few variables control the behaviour of this role. The most important of
-them is the template file.
+Only a few variables control the behaviour of this role.
+See [Template Variables](#template-variables) for variables applying to the
+template provided by the role.
+
+* The action to perform when playing the role.  Defaults to `template`.  When
+  the value is `append`, `insert` or `delete`, current iptables ruleset is the
+  starting point, and `iptables_apply__rules` the rules to be appended,
+  inserted or deleted.  Also note that like with the **iptables** module, the
+  rules that already exist in a chain are not moved within this chain.
+
+```yaml
+iptables_apply__action: template
+```
+
+* The iptables rules to `append`/`insert` to, or to `delete` from the current
+  rules, depending on `iptables_apply__action` value.  This is a list of
+  dictionnaries accepting the following keys:
+
+  | key | mandatory | type | choices | default | description |
+  | :-- | :-------- | :--- | :------ | :------ | :---------- |
+  | `chain` | no | keyword | `INPUT`, `FORWARD`, `OUTPUT` | `INPUT` | The chain the rule will be added to. |
+  | `dport` | yes | string or integer ||| Port number, port range, or comma-separated list of port numbers and port ranges. |
+  | `jump` | no | keyword | `ACCEPT`, `DROP`, `REJECT` | `ACCEPT` | What to do with packets matching the rule. |
+  | `name` | yes | string ||| Used as the rule's comment. |
+  | `protocol` | no | keyword | `tcp`, `udp` | `tcp` | The protocol packets have to match. |
+
+  Defaults to an empty list (`[]`)
+
+```yaml
+iptables_apply__rules:
+  - name: PostgreSQL
+    dport: 5432
+  - name: Knot DNS
+    dport: 53,953
+    protocol: udp
+```
 
 * If `True`, current iptables ruleset is not flushed and rules from the template
-  are **inserted** before the current ones.
+  (the one shipped with the role) are **inserted** before the current ones. This
+  value should not be changed unless `iptables_apply__action` is `template`.
 
 ```yaml
 iptables_apply__noflush: false
@@ -67,7 +102,7 @@ iptables_apply__persist: true
 ```
 
 * This defines the delay, in seconds, after what the initial iptables ruleset
-  is restored.
+  is restored, if not confirmed.
 
 ```yaml
 iptables_apply__timeout: 20
