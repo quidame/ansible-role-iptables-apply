@@ -20,12 +20,12 @@ iptables_apply__noflush: false
 
 
 ################################################################################
-# iptables_apply__save_state
+# iptables_apply__persist
 #
 # Whether or not to make the currently applied ruleset persistent across
-# reboots. Default is `yes`.
+# reboots. Default is `true`.
 #
-iptables_apply__save_state: true
+iptables_apply__persist: true
 
 
 ################################################################################
