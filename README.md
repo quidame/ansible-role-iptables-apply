@@ -13,7 +13,7 @@ host.
 - [Template Variables](#template-variables)
 - [Dependencies](#dependencies)
 - [Example Playbook](#example-playbook)
-- [Galaxy](#galaxy)
+- [Install](#install)
 - [License](#license)
 - [Author Information](#author-information)
 
@@ -176,8 +176,35 @@ Apply the same ruleset on an already configured firewall you want to keep.
       iptables_apply__noflush: yes
 ```
 
-Galaxy
-------
+Add a single passing rule.  Replace `append` by `delete` to remove it.
+
+```yaml
+- hosts: dns-servers
+  roles:
+    - role: iptables_apply
+      iptables_apply__action: append
+      iptables_apply__rules:
+        - name: Knot DNS
+          dport: 53,953
+          protocol: udp
+```
+
+Flush rules and reset policies, but keep firewall running and enabled.
+
+```yaml
+- hosts: all
+  roles:
+    - role: iptables_apply
+      iptables_apply__template_core: no
+      iptables_apply__template_rules: []
+      iptables_apply__template_policy:
+        input: ACCEPT
+        forward: ACCEPT
+        output: ACCEPT
+```
+
+Install
+-------
 
 To make use of this role as a galaxy role, put the following lines in
 `requirements.yml`:
@@ -185,7 +212,7 @@ To make use of this role as a galaxy role, put the following lines in
 ```yaml
 - name: iptables_apply
   src: https://github.com/quidame/ansible-role-iptables_apply.git
-  version: 0.2.0
+  version: 0.3.0
   scm: git
 ```
 
