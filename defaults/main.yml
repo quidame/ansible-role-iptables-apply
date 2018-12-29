@@ -1,5 +1,17 @@
 ---
 ################################################################################
+# iptables_apply__action
+#
+# Specifies the action to perform.
+# - `template` (the default): configure firewall from scratch; use the variable
+#   `iptables_apply__template_rules` to configure user-specific rules.
+# - `append`, `insert`, `delete`: use `iptables_apply__rules` to add or delete
+#   rules modifying the current firewall configuration.
+#
+iptables_apply__action: template
+
+
+################################################################################
 # iptables_apply__noflush
 #
 # If `True`, current iptables ruleset is not flushed.

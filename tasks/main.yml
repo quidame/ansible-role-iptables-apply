@@ -7,18 +7,19 @@
   failed_when: "ansible_connection not in ['paramiko','ssh']"
 
 
-# It will be used in case of rollback
+# It will be used in case of rollback, and as the starting point for `append`,
+# `insert` or `delete` actions.
 - name: save initial state of the firewall
-  shell: iptables-save > /run/iptables.saved
+  shell: >
+    iptables-save -t filter |
+    tee {{ iptables_apply__path_backup }} {{
+           iptables_apply__path_buffer if iptables_apply__action != 'template' else ''
+        }}
 
 
-# First ensure the resulting file is in good shape when making it available on
-# the remote host
-- name: build iptables ruleset to be applied
-  template:
-    src: "{{ iptables_apply__template }}"
-    dest: /run/iptables.apply
-    validate: "iptables-restore --test %s"
+# Do all the stuff using a template, or just delete/append/insert/update rules
+- name: build iptables ruleset
+  include_tasks: "iptables-{{ iptables_apply__action }}.yml"
 
 
 # No choice. We need a shell task to run in background. `async=1` and `poll=0`
@@ -28,15 +29,15 @@
   shell: >
     (
       set -e
-      rm -f /run/iptables.cookie
-      iptables-restore {{ '--noflush' if iptables_apply__noflush|bool == True else '' }} /run/iptables.apply
+      rm -f {{ iptables_apply__path_cookie }}
+      iptables-restore {{ '--noflush' if iptables_apply__noflush|bool == True else '' }} {{ iptables_apply__path_buffer }}
       i=0
       while test $i -lt {{ iptables_apply__timeout|int }}; do
         sleep 1; i=$((i+1))
-        test -e /run/iptables.cookie && exit 0
+        test -e {{ iptables_apply__path_cookie }} && exit 0
       done
-      iptables-restore /run/iptables.saved &&
-      touch /run/iptables.cookie
+      iptables-restore {{ iptables_apply__path_backup }} &&
+      touch {{ iptables_apply__path_cookie }}
     ) &
   async: 1
   poll: 0
@@ -47,7 +48,7 @@
 # rollback.
 - name: confirm applied ruleset
   file:
-    path: /run/iptables.cookie
+    path: "{{ iptables_apply__path_cookie }}"
     state: "{{ item }}"
   register: confirm
   failed_when: '( item == "absent" and confirm is changed ) or ( item == "touch" and confirm is not changed )'
