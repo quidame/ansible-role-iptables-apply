@@ -115,7 +115,7 @@ iptables_apply__service_started: true
 ```
 
 * This defines the delay, in seconds, after what the initial iptables ruleset
-  is restored, if not confirmed.
+  is restored, if the applied one is not confirmed.
 
 ```yaml
 iptables_apply__timeout: 20
@@ -202,18 +202,26 @@ Add a single passing rule.  Replace `append` by `delete` to remove it.
           protocol: udp
 ```
 
-Flush rules and reset policies, but keep firewall running and enabled.
+Do whatever you want with a custom template. It may as well include policies
+and rules for any table, not only the filter one.
 
 ```yaml
-- hosts: all
+- hosts: routers
   roles:
     - role: iptables_apply
-      iptables_apply__template_core: no
-      iptables_apply__template_rules: []
-      iptables_apply__template_policy:
-        input: ACCEPT
-        forward: ACCEPT
-        output: ACCEPT
+      iptables_apply__template: iptables/routers.j2
+```
+
+You may also want to play this role from another one (here, say from `foobar`):
+
+```yaml
+- include_role:
+    name: iptables_apply
+  vars:
+    iptables_apply__action: "{{ 'append' if foobar__action == 'setup' else 'delete' }}"
+    iptables_apply__rules:
+      - name: FooBar over HTTP/HTTPS
+        dport: "{{ foobar__http_port }},{{ foobar__https_port }}"
 ```
 
 Install
