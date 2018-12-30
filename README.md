@@ -101,6 +101,19 @@ iptables_apply__noflush: false
 iptables_apply__persist: true
 ```
 
+* The three following variables are about firewall's service management. As the
+  implementation may vary a lot, only two services are currently supported:
+  `iptables` for **Redhat** family, and `netfilter-persistent` for **Debian**
+  family.  To be usable by the role, an alternative service must implement a
+  `save` command. For the service name, the default value depends on the OS; for
+  its running state and activation state, defaults are `true` and `true`.
+
+```yaml
+iptables_apply__service: iptables
+iptables_apply__service_enabled: true
+iptables_apply__service_started: true
+```
+
 * This defines the delay, in seconds, after what the initial iptables ruleset
   is restored, if not confirmed.
 
