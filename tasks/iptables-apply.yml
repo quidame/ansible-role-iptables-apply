@@ -1,4 +1,12 @@
 ---
+# To validate changes, we will switch connection plugin to be sure to not reuse
+# a previous connection.
+- name: get current connection plugin
+  set_fact:
+    initial_connection: "{{ ansible_connection }}"
+  failed_when: "ansible_connection not in ['paramiko','ssh']"
+
+
 # No choice. We need a shell task to run in background. `async=1` and `poll=0`
 # are mandatory parameters to ensure ansible detaches itself from the script.
 # So the next task can be played DURING this one.
