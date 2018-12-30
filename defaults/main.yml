@@ -63,6 +63,27 @@ iptables_apply__rules: []
 
 
 ################################################################################
+# iptables_apply__service
+#
+# The name of the Systemd service that restores iptables ruleset at boot.
+# Default value depends on the distribution. You may want to override it in a
+# lot of cases.
+#
+iptables_apply__service: "{{ 'netfilter-persistent' if ansible_os_family == 'Debian' else 'iptables' }}"
+
+
+################################################################################
+# iptables_apply__service_enabled
+# iptables_apply__service_started
+#
+# These two variables define the state of the service at the end of the role
+# play. Default is `true` for each.
+#
+iptables_apply__service_enabled: true
+iptables_apply__service_started: true
+
+
+################################################################################
 # iptables_apply__template
 #
 # Path of a template file that once evaluated is used as input for the command
