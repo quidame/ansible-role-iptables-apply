@@ -31,6 +31,18 @@
 
 # Save applied ruleset so it will be applied again after reboot.
 - name: confirm applied ruleset as persistent
-  include_tasks: "iptables-save_{{ ansible_os_family|lower }}.yml"
-  when: iptables_apply__persist
+  command: "service {{ iptables_apply__service }} save"
+  args:
+    warn: no
+  when:
+    - iptables_ruleset is changed
+    - iptables_apply__persist
+
+
+# And finally, ensure the service is started and enabled (or not)
+- name: manage firewall service state and activation
+  systemd:
+    name: "{{ iptables_apply__service }}"
+    enabled: "{{ iptables_apply__service_enabled }}"
+    state: "{{ 'started' if iptables_apply__service_started else 'stopped' }}"
 
