@@ -36,13 +36,13 @@
     warn: no
   when:
     - iptables_ruleset is changed
-    - iptables_apply__persist
+    - iptables_apply__persist|bool
 
 
 # And finally, ensure the service is started and enabled (or not)
 - name: manage firewall service state and activation
   systemd:
     name: "{{ iptables_apply__service }}"
-    enabled: "{{ iptables_apply__service_enabled }}"
-    state: "{{ 'started' if iptables_apply__service_started else 'stopped' }}"
+    enabled: "{{ iptables_apply__service_enabled|bool }}"
+    state: "{{ 'started' if iptables_apply__service_started|bool else 'stopped' }}"
 
