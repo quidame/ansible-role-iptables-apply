@@ -67,7 +67,7 @@ iptables_apply__rules: []
 #
 # The name of the Systemd service that restores iptables ruleset at boot.
 # Default value depends on the distribution. You may want to override it in a
-# lot of cases.
+# lot of cases. Also note that this role does not install anything
 #
 iptables_apply__service: "{{ 'netfilter-persistent' if ansible_os_family == 'Debian' else 'iptables' }}"
 
