@@ -19,7 +19,7 @@
 
 # Do all the stuff using a template, or just delete/append/insert/update rules
 - name: build iptables ruleset
-  include_tasks: "iptables-{{ iptables_apply__action }}.yml"
+  include_tasks: "rules-{{ iptables_apply__action }}.yml"
 
 
 # Actually apply the ruleset and try to confirm it. The conditional is for
