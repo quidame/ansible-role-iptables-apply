@@ -22,7 +22,7 @@
     # The build `rule.name|wordcount` allows our task to mimic iptables command
     # behaviour regarding double quotes enclosure.  It's a good approximation,
     # but fails idempotency for names such as `foo-bar`, since `-` is a word
-    # separator.
+    # separator for jinja2, not for iptables.
     line: "-A {{
       rule.chain|default('INPUT') }} -p {{
       rule.protocol|default('tcp') }} -m {{
