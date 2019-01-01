@@ -1,12 +1,4 @@
 ---
-# To validate changes, we will switch connection plugin to be sure to not reuse
-# a previous connection.
-- name: get current connection plugin
-  set_fact:
-    initial_connection: "{{ ansible_connection }}"
-  failed_when: "ansible_connection not in ['paramiko','ssh']"
-
-
 # No choice. We need a shell task to run in background. `async=1` and `poll=0`
 # are mandatory parameters to ensure ansible detaches itself from the script.
 # So the next task can be played DURING this one.
@@ -14,33 +6,34 @@
   shell: >
     (
       set -e
-      rm -f {{ iptables_apply__path_cookie }}
+      touch {{ iptables_apply__path_cookie }}
+      trap 'rm -f {{ iptables_apply__path_backup }}' EXIT
       iptables-restore {{ '--noflush' if iptables_apply__noflush|bool == True else '' }} {{ iptables_apply__path_buffer }}
       i=0
       while test $i -lt {{ iptables_apply__timeout|int }}; do
         sleep 1; i=$((i+1))
-        test -e {{ iptables_apply__path_cookie }} && exit 0
+        test -e {{ iptables_apply__path_cookie }} || exit 0
       done
-      rm -f {{ iptables_apply__path_buffer }}
       iptables-restore {{ iptables_apply__path_backup }} &&
-      touch {{ iptables_apply__path_cookie }}
+      rm -f {{ iptables_apply__path_cookie }} {{ iptables_apply__path_buffer }}
     ) &
   async: 1
   poll: 0
 
 
-# If the cookie exists, it means initial ruleset has been restored, and it
-# shouln't. If it doesn't exist, it means we have to create it to avoid the
+# Reset connection, i.e. don't reuse a control socket from a previous task,
+# otherwise a rule such as:
+# -A INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+# may still accept ansible connections... for the entire playbook and no more.
+- meta: reset_connection
+
+
+# If the cookie doesn't exist, it means initial ruleset has been restored,
+# and it shouln't. If it exists, it means we have to remove it to avoid the
 # rollback.
 - name: confirm applied ruleset
   file:
     path: "{{ iptables_apply__path_cookie }}"
-    state: "{{ item }}"
+    state: absent
   register: confirm
-  failed_when: '( item == "absent" and confirm is changed ) or ( item == "touch" and confirm is not changed )'
-  with_items:
-    - absent
-    - touch
-  # By switching connection plugin, we are sure a new connection is initialized,
-  # i.e. we don't reuse a control socket from a previous task.
-  connection: "{{ 'paramiko' if initial_connection == 'ssh' else 'ssh' }}"
+  failed_when: confirm is not changed
