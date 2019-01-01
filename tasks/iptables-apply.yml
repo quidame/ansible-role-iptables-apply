@@ -9,6 +9,9 @@
       touch {{ iptables_apply__path_cookie }}
       trap 'rm -f {{ iptables_apply__path_backup }}' EXIT
       iptables-restore {{ '--noflush' if iptables_apply__noflush|bool == True else '' }} {{ iptables_apply__path_buffer }}
+      {% if iptables_apply__action != 'template' %}
+      rm -f {{ iptables_apply__path_buffer }}
+      {% endif %}
       i=0
       while test $i -lt {{ iptables_apply__timeout|int }}; do
         sleep 1; i=$((i+1))
