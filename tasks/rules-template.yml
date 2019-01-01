@@ -1,6 +1,7 @@
 ---
 # First ensure the resulting file is in good shape when making it available on
-# the remote host
+# the remote host. Do not perform action directly upon the system file nor the
+# system state.
 - name: rewrite iptables ruleset from scratch
   template:
     src: "{{ iptables_apply__template }}"

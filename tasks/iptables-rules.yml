@@ -4,7 +4,7 @@
 
 - name: "{{ iptables_apply__action }}{{ '' if iptables_apply__action == 'delete' else '/update' }} rules in current ruleset"
   lineinfile:
-    # Do not perform action directly upon the system file nor the system state
+    # Do not perform action directly upon the system file nor the system state.
     path: "{{ iptables_apply__path_buffer }}"
     # The following regexp catches rules matching either the `dport` or the
     # `name` values, making easy to never 'duplicate' a rule nor keep obsolete
