@@ -1,5 +1,12 @@
 ---
-# Internals
+# Temporary files to work with.
+# - the backup is for rolling back to the initial rules
+# - the buffer is for building a new ruleset from template or backup
 iptables_apply__path_backup: /run/iptables.backup
 iptables_apply__path_buffer: /run/iptables.buffer
-iptables_apply__path_cookie: /run/iptables.cookie
+
+# For debugging purposes. Set it to `true` to not remove the templated buffer.
+# This may be useful to:
+# - inspect its content
+# - skip further tasks when buffer is not changed
+iptables_apply__template_keep: false

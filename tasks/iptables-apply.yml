@@ -6,19 +6,18 @@
   shell: >
     (
       set -e
-      touch {{ iptables_apply__path_cookie }}
-      trap 'rm -f {{ iptables_apply__path_backup }}' EXIT
       iptables-restore {{ '--noflush' if iptables_apply__noflush|bool == True else '' }} {{ iptables_apply__path_buffer }}
-      {% if iptables_apply__action != 'template' %}
+      # Keep the templated buffer if wanted; default is to remove it.
+      {% if iptables_apply__action != 'template' or iptables_apply__template_keep|bool == False %}
       rm -f {{ iptables_apply__path_buffer }}
       {% endif %}
       i=0
       while test $i -lt {{ iptables_apply__timeout|int }}; do
         sleep 1; i=$((i+1))
-        test -e {{ iptables_apply__path_cookie }} || exit 0
+        test -e {{ iptables_apply__path_backup }} || exit 0
       done
       iptables-restore {{ iptables_apply__path_backup }} &&
-      rm -f {{ iptables_apply__path_cookie }} {{ iptables_apply__path_buffer }}
+      rm -f {{ iptables_apply__path_backup }}
     ) &
   async: 1
   poll: 0
@@ -34,9 +33,9 @@
 # If the cookie doesn't exist, it means initial ruleset has been restored,
 # and it shouln't. If it exists, it means we have to remove it to avoid the
 # rollback.
-- name: confirm applied ruleset
+- name: confirm new ruleset or fail (because of a rollback, or host is unreachable)
   file:
-    path: "{{ iptables_apply__path_cookie }}"
+    path: "{{ iptables_apply__path_backup }}"
     state: absent
   register: confirm
   failed_when: confirm is not changed
