@@ -1,12 +1,86 @@
 ---
+# The following variables stay here to not be overridden from the group_vars/
+# (playbook layer as well as inventory layer).
+
+
+################################################################################
+# iptables_apply__noflush
+#
+# If `True`, current iptables rules are not flushed, and so they'll still be
+# applied to packets not matching any rule from the template.  Default is
+# `false`.
+#
+iptables_apply__noflush: false
+
+
+################################################################################
+# iptables_apply__persist
+#
+# Whether or not to make the currently applied ruleset persistent across
+# reboots. Default is `true`.
+#
+iptables_apply__persist: true
+
+
+################################################################################
+# iptables_apply__service_enabled
+# iptables_apply__service_started
+#
+# These two variables define the state of the service at the end of the role
+# play. Default is `true` for each.
+#
+iptables_apply__service_enabled: true
+iptables_apply__service_started: true
+
+
+################################################################################
+# iptables_apply__template_core
+#
+# Whether or not to apply the core ruleset provided by the template. The core
+# rules, a.k.a. sanity rules, are inserted to ensure they will be evaluated
+# first even if `iptables_apply__noflush` is True. Defaults to `true`.
+#
+iptables_apply__template_core: true
+
+
+################################################################################
+# iptables_apply__template_policy
+#
+# The default policy to apply for each chain of the filter table. If a policy
+# is undefined in this variable, then it will not be changed on the target. For
+# example, to keep all current policies (useful with 'iptables_apply__noflush'
+# set to 'True'):
+# iptables_apply__template_policy: {}
+#
+iptables_apply__template_policy:
+  input: DROP
+  forward: DROP
+  output: ACCEPT
+
+
+################################################################################
+# iptables_apply__template_keep
+#
+# For debugging purposes. Set it to `true` to not remove the templated buffer.
+# This may be useful to:
+# - inspect its content after rollback (you may also use diff mode)
+# - skip further tasks when buffer is not changed, and grant global idempotency
+#   when building your own template
+#
+# The side effect is that the templated buffer is not reapplied if rules have
+# been modified manually (or by any way except this role) between two plays.
+#
+iptables_apply__template_keep: false
+
+
+################################################################################
+# iptables_apply__path_backup
+# iptables_apply__path_buffer
+#
 # Temporary files to work with.
 # - the backup is for rolling back to the initial rules
 # - the buffer is for building a new ruleset from template or backup
-iptables_apply__path_backup: /run/iptables.backup
-iptables_apply__path_buffer: /run/iptables.buffer
+#
+iptables_apply__path_backup: /run/iptables.saved
+iptables_apply__path_buffer: /run/iptables.apply
 
-# For debugging purposes. Set it to `true` to not remove the templated buffer.
-# This may be useful to:
-# - inspect its content
-# - skip further tasks when buffer is not changed
-iptables_apply__template_keep: false

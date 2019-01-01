@@ -12,25 +12,6 @@ iptables_apply__action: template
 
 
 ################################################################################
-# iptables_apply__noflush
-#
-# If `True`, current iptables rules are not flushed, and so they'll still be
-# applied to packets not matching any rule from the template.  Default is
-# `false`
-#
-iptables_apply__noflush: false
-
-
-################################################################################
-# iptables_apply__persist
-#
-# Whether or not to make the currently applied ruleset persistent across
-# reboots. Default is `true`.
-#
-iptables_apply__persist: true
-
-
-################################################################################
 # iptables_apply__rules
 #
 # The iptables rules to apply in addition to the sanity ruleset provided by
@@ -73,48 +54,12 @@ iptables_apply__service: "{{ 'netfilter-persistent' if ansible_os_family == 'Deb
 
 
 ################################################################################
-# iptables_apply__service_enabled
-# iptables_apply__service_started
-#
-# These two variables define the state of the service at the end of the role
-# play. Default is `true` for each.
-#
-iptables_apply__service_enabled: true
-iptables_apply__service_started: true
-
-
-################################################################################
 # iptables_apply__template
 #
 # Path of a template file that once evaluated is used as input for the command
 # `iptables-restore`.
 #
 iptables_apply__template: iptables_apply.j2
-
-
-################################################################################
-# iptables_apply__template_core
-#
-# Whether or not to apply the core ruleset provided by the template. The core
-# rules, a.k.a. sanity rules, are inserted to ensure they will be evaluated
-# first even if `iptables_apply__noflush` is True. Defaults to `true`.
-#
-iptables_apply__template_core: true
-
-
-################################################################################
-# iptables_apply__template_policy
-#
-# The default policy to apply for each chain of the filter table. If a policy
-# is undefined in this variable, then it will not be changed on the target. For
-# example, to keep all current policies (useful with 'iptables_apply__noflush'
-# set to 'True'):
-# iptables_apply__template_policy: {}
-#
-iptables_apply__template_policy:
-  input: DROP
-  forward: DROP
-  output: ACCEPT
 
 
 ################################################################################
