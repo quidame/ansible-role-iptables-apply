@@ -3,7 +3,7 @@
 # `insert` or `delete` actions.
 - name: save initial state of the firewall
   shell: >
-    iptables-save -t filter |
+    iptables-save {{ '-t filter' if iptables_apply__action != 'template' else '' }} |
     tee {{ iptables_apply__path_backup }} {{
            iptables_apply__path_buffer if iptables_apply__action != 'template' else ''
         }}
