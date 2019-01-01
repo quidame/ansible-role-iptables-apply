@@ -10,7 +10,11 @@ host.
 - [Description](#description)
 - [Requirements](#requirements)
 - [Role Variables](#role-variables)
+  - [Common Variables](#common-variables)
+  - [Advanced Variables](#advanced-variables)
 - [Template Variables](#template-variables)
+  - [Common Templating](#common-templating)
+  - [Advanced Templating](#advanced-templating)
 - [Dependencies](#dependencies)
 - [Example Playbook](#example-playbook)
 - [Install](#install)
@@ -43,21 +47,32 @@ This role comes with the following features:
 Requirements
 ------------
 
-Both `ssh` and `paramiko` clients must be supported by the controller. This
-role doesn't work in *Cygwin* environment.
+Firewall management service (`iptables` or `netfilter-persistent`) must be
+installed apart.
 
 Role Variables
 --------------
+
+All variables used by the role are explicitly declared either in *defaults* or
+in *vars* directories. Those declared in *vars* shouldn't be overridden in
+almost all cases (and can't be overridden in *group_vars* or *host_vars*). So
+this section is divided into two parts,
+[Common Variables](#common-variables) and
+[Advanced Variables](#advanced-variables)
 
 Only a few variables control the behaviour of this role.
 See [Template Variables](#template-variables) for variables applying to the
 template provided by the role.
 
+### Common Variables
+
 * The action to perform when playing the role.  Defaults to `template`.  When
   the value is `append`, `insert` or `delete`, current iptables ruleset is the
   starting point, and `iptables_apply__rules` the rules to be appended,
   inserted or deleted.  Also note that like with the **iptables** module, the
-  rules that already exist in a chain are not moved within this chain.
+  rules that already exist in a chain are not moved within this chain. But they
+  can be updated if only one of their destination port(s) or comment string has
+  changed.
 
 ```yaml
 iptables_apply__action: template
@@ -75,20 +90,43 @@ iptables_apply__action: template
   | `name` | yes | string ||| Used as the rule's comment. |
   | `protocol` | no | keyword | `tcp`, `udp` | `tcp` | The protocol packets have to match. |
 
-  Defaults to an empty list (`[]`)
+  Defaults to an empty list (`[]`). Example:
 
 ```yaml
 iptables_apply__rules:
   - name: PostgreSQL
     dport: 5432
+    #protocol: tcp
+    #chain: INPUT
+    #jump: ACCEPT
   - name: Knot DNS
     dport: 53,953
     protocol: udp
 ```
 
+* The following variable defines the firewall's service name. As the
+  implementation may vary a lot, only two services are currently supported:
+  `iptables` for **Redhat** family, and `netfilter-persistent` for **Debian**
+  family.  To be usable by the role, an alternative service must implement a
+  `save` command. Default depends on the OS.
+
+```yaml
+iptables_apply__service: iptables
+```
+
+* This defines the delay, in seconds, after what the initial iptables ruleset
+  is restored, if the applied one is not confirmed.
+
+```yaml
+iptables_apply__timeout: 20
+```
+
+### Advanced Variables
+
 * If `True`, current iptables ruleset is not flushed and rules from the template
   (the one shipped with the role) are **inserted** before the current ones. This
   value should not be changed unless `iptables_apply__action` is `template`.
+  This is for one-shots (the more you use it, the more you duplicate the rules).
 
 ```yaml
 iptables_apply__noflush: false
@@ -101,24 +139,21 @@ iptables_apply__noflush: false
 iptables_apply__persist: true
 ```
 
-* The three following variables are about firewall's service management. As the
-  implementation may vary a lot, only two services are currently supported:
-  `iptables` for **Redhat** family, and `netfilter-persistent` for **Debian**
-  family.  To be usable by the role, an alternative service must implement a
-  `save` command. For the service name, the default value depends on the OS; for
-  its running state and activation state, defaults are `true` and `true`.
+* The two following variables are about firewall's service management.
+  Running state defaults to `true`, activation state defaults to `true`.
 
 ```yaml
-iptables_apply__service: iptables
 iptables_apply__service_enabled: true
 iptables_apply__service_started: true
 ```
 
-* This defines the delay, in seconds, after what the initial iptables ruleset
-  is restored, if the applied one is not confirmed.
+* The two following variables define the paths of two temporary files to create
+  and work with, and then remove. There is absolutely no reason to modify their
+  values.
 
 ```yaml
-iptables_apply__timeout: 20
+iptables_apply__path_backup: /run/iptables.saved
+iptables_apply__path_buffer: /run/iptables.apply
 ```
 
 Template Variables
@@ -127,6 +162,15 @@ Template Variables
 The following variables refer to the template that comes with the role.  They
 make sense as long as `iptables_apply__action`'s value is `template`.
 
+All variables used by the role are explicitly declared either in *defaults* or
+in *vars* directories. Those declared in *vars* shouldn't be overridden in
+almost all cases (and can't be overridden in *group_vars* or *host_vars*). So
+this section is divided into two parts,
+[Common Templatings](#common-templating) and
+[Advanced Templating](#advanced-templating)
+
+### Common Templating
+
 * This defines the path of a template file that once evaluated is used as input
   for the command `iptables-restore`.  Defaults to the template shipped with
   the role.
@@ -134,6 +178,16 @@ make sense as long as `iptables_apply__action`'s value is `template`.
 ```yaml
 iptables_apply__template: iptables_apply.j2
 ```
+
+* The iptables rules to apply in addition to the sanity rules provided by the
+  template.  This is a list of dictionnaries with the same keys than
+  `iptables_apply__rules`, and defaults to the same value.
+
+```yaml
+iptables_apply__template_rules: "{{ iptables_apply__rules }}"
+```
+
+### Advanced Templating
 
 * Whether or not to apply the core ruleset provided by the template. The core
   rules, a.k.a. sanity rules, are inserted to ensure they will be evaluated
@@ -155,12 +209,12 @@ iptables_apply__template_policy:
   output: ACCEPT
 ```
 
-* The iptables rules to apply in addition to the sanity rules provided by the
-  template.  This is a list of dictionnaries with the same keys than
-  `iptables_apply__rules`, and defaults to the same value.
+* For debugging purposes. Set it to `true` to not remove the templated buffer.
+  The side effect is that the templated buffer is not reapplied if rules have
+  been modified manually (or by any way except this role) between two plays.
 
 ```yaml
-iptables_apply__template_rules: "{{ iptables_apply__rules }}"
+iptables_apply__template_keep: false
 ```
 
 Dependencies
@@ -187,6 +241,22 @@ Apply the same ruleset on an already configured firewall you want to keep.
   roles:
     - role: iptables_apply
       iptables_apply__noflush: yes
+```
+
+Apply core ruleset and some passing rules for monitoring tools.
+
+```yaml
+- hosts: servers
+  roles:
+    - role: iptables_apply
+      iptables_apply__template_rules:
+        - name: NRPE
+          dport: 5666
+        - name: SNMP
+          dport: 161
+        - name: SNMP
+          dport: 161
+          protocol: udp
 ```
 
 Add a single passing rule.  Replace `append` by `delete` to remove it.
