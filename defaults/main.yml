@@ -57,7 +57,9 @@ iptables_apply__service: "{{ 'netfilter-persistent' if ansible_os_family == 'Deb
 # iptables_apply__template
 #
 # Path of a template file that once evaluated is used as input for the command
-# `iptables-restore`.
+# `iptables-restore`. This allows one to implement custom templates with all the
+# stuff and granularity she wants. The role provides two templates: the default
+# one and another to flush desired tables.
 #
 iptables_apply__template: iptables_apply.j2
 

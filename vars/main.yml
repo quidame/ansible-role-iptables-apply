@@ -59,18 +59,35 @@ iptables_apply__template_policy:
 
 
 ################################################################################
-# iptables_apply__template_keep
+# iptables_apply__template_once
 #
-# For debugging purposes. Set it to `true` to not remove the templated buffer.
-# This may be useful to:
-# - inspect its content after rollback (you may also use diff mode)
-# - skip further tasks when buffer is not changed, and grant global idempotency
-#   when building your own template
+iptables_apply__template_once: true
+
+
+################################################################################
+# iptables_apply__template_mark
 #
-# The side effect is that the templated buffer is not reapplied if rules have
-# been modified manually (or by any way except this role) between two plays.
+iptables_apply__template_mark: '"bad NEWs"'
+
+
+################################################################################
+# iptables_apply__flush
 #
-iptables_apply__template_keep: false
+# The template to evaluate when `iptables_apply__action` is set to `flush`.
+# Defaults to `iptables_flush.j2`.
+#
+iptables_apply__flush: iptables_flush.j2
+
+
+################################################################################
+# iptables_apply__flush_tables
+#
+# When using `iptables_flush.j2` as the template to apply in place of the
+# default `iptables_apply.j2`, this variable defines the list of tables to
+# flush. Accepts a single keyword (a table name, or 'all'), or a list of these
+# keywords. Defaults to 'filter'.
+#
+iptables_apply__flush_tables: filter
 
 
 ################################################################################
