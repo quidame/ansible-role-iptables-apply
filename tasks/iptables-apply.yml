@@ -2,6 +2,9 @@
 # No choice. We need a shell task to run in background. `async=1` and `poll=0`
 # are mandatory parameters to ensure ansible detaches itself from the script.
 # So the next task can be played DURING this one.
+# Also, by using the temporary backup file as a cookie (absent/present), we can
+# either roll back or validate the rules and in the same time cleanup the file,
+# as attempting to remove it AFTER the failure comes too late.
 - name: apply iptables ruleset
   shell: >
     (
@@ -33,13 +36,11 @@
     - name: check ansible version and reset connection
       assert:
         that:
-          - ( ansible_connection == 'ssh' )
-          - ( ansible_version.major == 2 )
-          - ( ansible_version.minor >= 6 ) or
-            ( ansible_version.minor == 5 and ansible_version.revision >= 6 )
+          - ansible_connection == 'ssh'
+          - ansible_version.full is version_compare('2.5.5', '>')
     - meta: reset_connection
   rescue:
-    - name: force connection with paramiko instead
+    - name: so, force connection with paramiko instead
       set_fact:
         ansible_connection: paramiko
       when: ansible_connection == 'ssh'
@@ -76,3 +77,4 @@
   vars:
     msg_success: "The new iptables ruleset has been applied successfully !"
     msg_failure: "The iptables rollback occured before the NEW connection."
+
