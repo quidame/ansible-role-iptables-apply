@@ -234,7 +234,7 @@ iptables_apply__template_mark: '"bad NEWs"'
 ```
 
 * This defines the path of an alternative template used to flush rules and
-  reset policies to ACCEPT all packets. It is Only effective when
+  reset policies to ACCEPT all packets. It is only effective when
   `iptables_apply__action` is set to `flush`.
 
 ```yaml
