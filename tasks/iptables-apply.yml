@@ -7,10 +7,7 @@
     (
       set -e
       iptables-restore {{ '--noflush' if iptables_apply__noflush|bool == True else '' }} {{ iptables_apply__path_buffer }}
-      # Keep the templated buffer if wanted; default is to remove it.
-      {% if iptables_apply__action != 'template' or iptables_apply__template_keep|bool == False %}
       rm -f {{ iptables_apply__path_buffer }}
-      {% endif %}
       i=0
       while test $i -lt {{ iptables_apply__timeout|int }}; do
         sleep 1; i=$((i+1))
@@ -23,19 +20,59 @@
   poll: 0
 
 
-# Reset connection, i.e. don't reuse a control socket from a previous task,
-# otherwise a rule such as:
+# Reset connection or switch connection plugin if necessary, i.e. do whatever
+# is needed to not reuse a control socket from a previous task, otherwise an
+# iptables rule such as:
 # -A INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 # may still accept ansible connections... for the entire playbook and no more.
-- meta: reset_connection
+# Depending on the ansible version, the 'reset_connection' (new in 2.3) is
+# buggy. Anyway, a meta task error can't be bypassed in a block, so we have
+# to prepend the meta by another task that will trigger the error to prevent
+# the meta error.
+- block:
+    - name: check ansible version and reset connection
+      assert:
+        that:
+          - ( ansible_connection == 'ssh' )
+          - ( ansible_version.major == 2 )
+          - ( ansible_version.minor >= 6 ) or
+            ( ansible_version.minor == 5 and ansible_version.revision >= 6 )
+    - meta: reset_connection
+  rescue:
+    - name: force connection with paramiko instead
+      set_fact:
+        ansible_connection: paramiko
+      when: ansible_connection == 'ssh'
+
+
+# We should never get a connection error (UNREACHABLE) since the rollback, if
+# any, has a shorter timeout than the connection.
+- name: wait for NEW connection
+  wait_for_connection:
+    timeout: "{{ iptables_apply__timeout|int + 5 }}"
 
 
 # If the cookie doesn't exist, it means initial ruleset has been restored,
 # and it shouln't. If it exists, it means we have to remove it to avoid the
 # rollback.
-- name: confirm new ruleset or fail (because of a rollback, or host is unreachable)
-  file:
-    path: "{{ iptables_apply__path_backup }}"
-    state: absent
-  register: confirm
-  failed_when: confirm is not changed
+- block:
+    - name: confirm applied ruleset to avoid rollback (file-based implementation)
+      file:
+        path: "{{ iptables_apply__path_backup }}"
+        state: absent
+      register: confirm
+      failed_when: confirm is not changed
+
+    - name: SUCCESS
+      debug:
+        msg: "{{ msg_success }}"
+
+  rescue:
+    - name: FAILURE
+      debug:
+        msg: "{{ msg_failure }}"
+      failed_when: true
+
+  vars:
+    msg_success: "The new iptables ruleset has been applied successfully !"
+    msg_failure: "The iptables rollback occured before the NEW connection."
