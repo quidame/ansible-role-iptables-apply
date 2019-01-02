@@ -74,6 +74,11 @@ template provided by the role.
   can be updated if only one of their destination port(s) or comment string has
   changed.
 
+  The action `flush` is also supported. It removes all rules and resets policy
+  to *ACCEPT* for all chains of the tables listed in the variable
+  `iptables_apply__flush_tables` (*filter* by default). This action makes that
+  the service is *stopped* and *disabled*.
+
 ```yaml
 iptables_apply__action: template
 ```
@@ -209,12 +214,43 @@ iptables_apply__template_policy:
   output: ACCEPT
 ```
 
-* For debugging purposes. Set it to `true` to not remove the templated buffer.
-  The side effect is that the templated buffer is not reapplied if rules have
-  been modified manually (or by any way except this role) between two plays.
+* As the templating of a temporary file can't be idempotent, and as the
+  templating of iptables is in itself very agressive, there must be a way to
+  not replay the template action to not loose application rules appended
+  between two plays. This is the purpose of this variable. Set it to `false`
+  to force a replay.
 
 ```yaml
-iptables_apply__template_keep: false
+iptables_apply__template_once: true
+```
+
+* This variable defines a regexp that should be found in the `iptables-save`
+  output to know/decide if the templated ruleset is already in use. Defaults
+  to the value of the comment of the rule dropping TCP packets in state NEW
+  and not coming with only the `SYN` flag.
+
+```yaml
+iptables_apply__template_mark: '"bad NEWs"'
+```
+
+* This defines the path of an alternative template used to flush rules and
+  reset policies to ACCEPT all packets. It is Only effective when
+  `iptables_apply__action` is set to `flush`.
+
+```yaml
+iptables_apply__flush: iptables_flush.j2
+```
+
+* This lists the tables to flush when evaluating `iptables_flush.j2`, i.e.
+  either when
+  `iptables_apply__action = flush` and
+  `iptables_apply__flush = iptables_flush.j2`, or when
+  `iptables_apply__template = iptables_flush.j2`.
+  It accepts either a keyword (table name or `all`) or a list of these
+  keywords. Defaults to `filter`.
+
+```yaml
+iptables_apply__flush_tables: filter
 ```
 
 Dependencies
