@@ -1,0 +1,22 @@
+---
+- name: force values for further tasks
+  set_fact:
+    iptables_apply__noflush: false
+    iptables_apply__persist: true
+    iptables_apply__service_enabled: false
+    iptables_apply__service_started: false
+
+
+- name: delete all rules and reset policies to 'ACCEPT' for all chains
+  template:
+    src: "{{ iptables_apply__flush }}"
+    dest: "{{ iptables_apply__path_buffer }}"
+    validate: "iptables-restore --test %s"
+  register: iptables_ruleset
+
+
+- name: cleanup temporary backup (planning to skip further tasks)
+  file:
+    path: "{{ iptables_apply__path_backup }}"
+    state: absent
+  when: iptables_ruleset is not changed
