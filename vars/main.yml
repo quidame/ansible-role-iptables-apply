@@ -1,6 +1,7 @@
 ---
 # The following variables stay here to not be overridden from the group_vars/
-# (playbook layer as well as inventory layer).
+# (playbook layer as well as inventory layer). There is no need to modify them
+# in almost all cases. So, ** DON'T MODIFY THEM, UNLESS YOU KNOW WHAT YOU DO **
 
 
 ################################################################################
@@ -59,15 +60,25 @@ iptables_apply__template_policy:
 
 
 ################################################################################
+# iptables_apply__template_mark
 # iptables_apply__template_once
 #
-iptables_apply__template_once: true
-
-
-################################################################################
-# iptables_apply__template_mark
+# 2 things:
+# 1. It is not possible to get idempotency by templating a temporary file;
+# 2. Rewriting an iptables ruleset from scratch leads to loose all rules that
+#    are not templated
+#
+# So, we use a marker, i.e. a string that we should find in the current rules
+# to know if the template has already been applied or not. It also means that
+# this string should not be found in the rules if they don't come from this
+# template.
+#
+# The first variable (mark) is the string to look for, to not blindly replay
+# the template. The second variable (once) is a boolean allowing one to force
+# the replay, when set to 'false' (defaults to 'true').
 #
 iptables_apply__template_mark: '"bad NEWs"'
+iptables_apply__template_once: true
 
 
 ################################################################################

@@ -50,3 +50,4 @@
   loop_control:
     loop_var: tmpfile
   when: iptables_ruleset is not changed
+

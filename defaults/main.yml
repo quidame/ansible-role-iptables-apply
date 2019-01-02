@@ -1,4 +1,9 @@
 ---
+# Overridding the following variables allows anyone to do the most common tasks
+# expected from any whatever-iptables role, such as: flush firewall, set it up
+# from scratch, open or close ports when installing or uninstalling a service.
+
+
 ################################################################################
 # iptables_apply__action
 #
@@ -7,6 +12,8 @@
 #   `iptables_apply__template_rules` to configure user-specific rules.
 # - `append`, `insert`, `delete`: use `iptables_apply__rules` to add or delete
 #   rules modifying the current firewall configuration.
+# - `flush`: flush iptables rules and set policy to `ACCEPT` for all chains. It
+#   also ensures the service is stopped and disabled.
 #
 iptables_apply__action: template
 
@@ -14,8 +21,9 @@ iptables_apply__action: template
 ################################################################################
 # iptables_apply__rules
 #
-# The iptables rules to apply in addition to the sanity ruleset provided by
-# the template. This is a list of dictionnaries accepting the following keys:
+# The iptables rules to apply when `iptables_apply__action` is one of `append`,
+# `delete` or `insert`. This is a list of dictionnaries accepting the following
+# keys:
 # * name
 #   Mandatory. String. Used as the rule's comment
 # * chain
@@ -48,7 +56,10 @@ iptables_apply__rules: []
 #
 # The name of the Systemd service that restores iptables ruleset at boot.
 # Default value depends on the distribution. You may want to override it in a
-# lot of cases. Also note that this role does not install anything
+# lot of cases. Also note that this role does not install anything, it just
+# applies rules in a safe way and ensures they will be applied after reboot.
+# On Debian, netfilter-persistent also needs iptables-persistent (the second
+# one is a plugin of the first).
 #
 iptables_apply__service: "{{ 'netfilter-persistent' if ansible_os_family == 'Debian' else 'iptables' }}"
 
@@ -59,7 +70,8 @@ iptables_apply__service: "{{ 'netfilter-persistent' if ansible_os_family == 'Deb
 # Path of a template file that once evaluated is used as input for the command
 # `iptables-restore`. This allows one to implement custom templates with all the
 # stuff and granularity she wants. The role provides two templates: the default
-# one and another to flush desired tables.
+# one (for the `template` action) and another to flush desired tables (for the
+# `flush` action).
 #
 iptables_apply__template: iptables_apply.j2
 

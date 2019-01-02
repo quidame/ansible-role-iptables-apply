@@ -1,4 +1,5 @@
 ---
+# This is not very good...
 - name: check that templated rules are not already in use
   check_mode: true
   lineinfile:
@@ -22,8 +23,11 @@
       ( check_rule is not changed )
 
 
+# Tasks in iptables-apply.yml need this file and will remove it. But when
+# iptables_ruleset is not changed, they will be skipped.
 - name: cleanup temporary backup (planning to skip further tasks)
   file:
     path: "{{ iptables_apply__path_backup }}"
     state: absent
   when: iptables_ruleset is not changed
+
