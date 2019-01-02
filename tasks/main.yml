@@ -3,14 +3,17 @@
 # `insert` or `delete` actions.
 - name: save initial state of the firewall
   shell: >
-    iptables-save {{ '-t filter' if iptables_apply__action != 'template' else '' }} |
+    iptables-save {{ '-t filter' if iptables_apply__action not in ['template','flush'] else '' }} |
     tee {{ iptables_apply__path_backup }} {{
-           iptables_apply__path_buffer if iptables_apply__action != 'template' else ''
+           iptables_apply__path_buffer if iptables_apply__action not in ['template','flush'] else ''
         }}
 
 
-# Do all the stuff using a template, or just delete/append/insert/update rules
-- name: build iptables ruleset
+# Do all the stuff using a template, or just delete/append/insert/update rules.
+# Do not ever try to modify system state (iptables state) nor system files (in
+# /etc) at this step.  All actions are performed against a temporary file, the
+# 'buffer'.
+- name: build iptables ruleset in a temporary buffer
   include_tasks: "rules-{{ iptables_apply__action }}.yml"
 
 
@@ -18,7 +21,9 @@
 # idempotency.
 - name: apply iptables ruleset
   include_tasks: iptables-apply.yml
-  when: iptables_ruleset is changed
+  when:
+    - iptables_ruleset is defined
+    - iptables_ruleset is changed
 
 
 # Save applied ruleset so it will be applied again after reboot.
@@ -27,14 +32,21 @@
   args:
     warn: no
   when:
+    - iptables_ruleset is defined
     - iptables_ruleset is changed
     - iptables_apply__persist|bool
 
 
-# And finally, ensure the service is started and enabled (or not)
+# And finally, ensure the service is started and enabled (or not). The use of
+# a loop for only one item is to display each attribute of the item.
 - name: manage firewall service state and activation
   systemd:
     name: "{{ iptables_apply__service }}"
-    enabled: "{{ iptables_apply__service_enabled|bool }}"
-    state: "{{ 'started' if iptables_apply__service_started|bool else 'stopped' }}"
+    enabled: "{{ service.enabled }}"
+    state: "{{ service.state }}"
+  loop:
+    - { enabled: "{{ iptables_apply__service_enabled|bool }}",
+        state: "{{ 'started' if iptables_apply__service_started|bool else 'stopped' }}" }
+  loop_control:
+    loop_var: service
 
