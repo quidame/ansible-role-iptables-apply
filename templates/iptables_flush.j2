@@ -1,0 +1,63 @@
+# {{ ansible_managed }}
+
+{#-
+  This is a template to flush iptables entirely or partially, in a per-table
+  basis. The templating is controlled using the following variables:
+
+  iptables_apply__action: flush
+  iptables_apply__flush: iptables_flush.j2	(this is the default)
+  iptables_apply__flush_tables: filter		(this is the default)
+
+  The variable `iptables_apply__flush_tables` accepts either a single keyword
+  (a table name among 'filter', 'mangle', 'nat', 'raw' and 'security', or 'all')
+  or a list of these keywords. Unsupported keywords are silently ignored.
+
+  ## Examples
+
+	iptables_apply__flush_tables:
+	  - filter
+	  - nat
+
+  The following are equivatent:
+
+	iptables_apply__flush_tables:
+	  - filter
+	  - mangle
+	  - nat
+	  - raw
+	  - security
+
+	iptables_apply__flush_tables:
+	  - all
+
+	iptables_apply__flush_tables: all
+#}
+
+
+{%- set all_supported_tables = ['filter','mangle','nat','raw','security'] %}
+
+{%- if 'all' in [iptables_apply__flush_tables]|flatten %}
+{%- set iptables_apply__flush_tables = all_supported_tables %}
+{%- endif %}
+
+{% for table in [iptables_apply__flush_tables]|flatten|unique %}
+{% if   table == 'filter' %}
+{% set chains = ['INPUT','FORWARD','OUTPUT'] %}
+{% elif table == 'mangle' %}
+{% set chains = ['PREROUTING','INPUT','FORWARD','OUTPUT','POSTROUTING'] %}
+{% elif table == 'nat' %}
+{% set chains = ['PREROUTING','INPUT','OUTPUT','POSTROUTING'] %}
+{% elif table == 'raw' %}
+{% set chains = ['PREROUTING','OUTPUT'] %}
+{% elif table == 'security' %}
+{% set chains = ['INPUT','FORWARD','OUTPUT'] %}
+{% else %}
+{% set chains = [] %}
+{% endif %}
+
+*{{ table }}
+{% for chain in chains %}
+:{{ chain }} ACCEPT [0:0]
+{% endfor %}
+COMMIT
+{% endfor %}
