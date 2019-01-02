@@ -1,0 +1,22 @@
+---
+# Play the role all crude, close SSH port to trigger a failure/rollback and if
+# so, flush the filter table.
+- hosts: all
+  become: yes
+  roles:
+    - role: iptables_apply
+  tasks:
+    - name: attempt and gracefull rollback demo
+      block:
+        - include_role:
+            name: iptables_apply
+          vars:
+            iptables_apply__action: delete
+            iptables_apply__rules:
+              - name: SSH
+                dport: "{{ ansible_port | default(22) }}"
+      rescue:
+        - include_role:
+            name: iptables_apply
+          vars:
+            iptables_apply__action: flush
