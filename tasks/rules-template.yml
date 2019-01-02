@@ -1,4 +1,13 @@
 ---
+- name: check that templated rules are not already in use
+  check_mode: true
+  lineinfile:
+    path: "{{ iptables_apply__path_backup }}"
+    regexp: "{{ iptables_apply__template_mark }}"
+    state: absent
+  register: check_rule
+
+
 # First ensure the resulting file is in good shape when making it available on
 # the remote host. Do not perform action directly upon the system file nor the
 # system state.
@@ -8,3 +17,13 @@
     dest: "{{ iptables_apply__path_buffer }}"
     validate: "iptables-restore --test %s"
   register: iptables_ruleset
+  when:
+    - ( iptables_apply__template_once|default(True)|bool == False ) or
+      ( check_rule is not changed )
+
+
+- name: cleanup temporary backup (planning to skip further tasks)
+  file:
+    path: "{{ iptables_apply__path_backup }}"
+    state: absent
+  when: iptables_ruleset is not changed

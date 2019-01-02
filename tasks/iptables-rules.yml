@@ -38,3 +38,15 @@
   loop_control:
     loop_var: rule
   register: iptables_ruleset
+
+
+- name: cleanup temporary backup and buffer (planning to skip further tasks)
+  file:
+    path: "{{ tmpfile }}"
+    state: absent
+  loop:
+    - "{{ iptables_apply__path_backup }}"
+    - "{{ iptables_apply__path_buffer }}"
+  loop_control:
+    loop_var: tmpfile
+  when: iptables_ruleset is not changed
