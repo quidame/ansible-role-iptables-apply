@@ -9,7 +9,8 @@
   shell: >
     (
       set -e
-      iptables-restore {{ '--noflush' if iptables_apply__noflush|bool == True else '' }} {{ iptables_apply__path_buffer }}
+      iptables-restore {{ '' if iptables_apply__action != 'template' or
+                          iptables_apply__noflush|bool != True else '--noflush' }} {{ iptables_apply__path_buffer }}
       rm -f {{ iptables_apply__path_buffer }}
       i=0
       while test $i -lt {{ iptables_apply__timeout|int }}; do
@@ -37,12 +38,13 @@
       assert:
         that:
           - ansible_connection == 'ssh'
-          - ansible_version.full is version_compare('2.5.5', '>')
+          - ansible_version.full is version_compare( '2.5.6', '>=' )
     - meta: reset_connection
   rescue:
     - name: so, force connection with paramiko instead
       set_fact:
         ansible_connection: paramiko
+        force_connection_plugin: yes
       when: ansible_connection == 'ssh'
 
 
@@ -67,6 +69,11 @@
     - name: SUCCESS
       debug:
         msg: "{{ msg_success }}"
+
+    - name: restore connection plugin
+      set_fact:
+        ansible_connection: ssh
+      when: force_connection_plugin is defined
 
   rescue:
     - name: FAILURE

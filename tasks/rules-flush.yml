@@ -3,8 +3,7 @@
 # `flush`.
 - name: force values for further tasks
   set_fact:
-    # Even if it is their default values, ensure to use THESE values.
-    iptables_apply__noflush: false
+    # Even if it is its default value, ensure to use THIS value:
     iptables_apply__persist: true
     # The rationale is that if we flush the tables, the service should be
     # disabled, so basic monitoring tools may be aware of that. Parsing the
