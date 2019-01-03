@@ -4,13 +4,15 @@
 # So the next task can be played DURING this one.
 # Also, by using the temporary backup file as a cookie (absent/present), we can
 # either roll back or validate the rules and in the same time cleanup the file,
-# as attempting to remove it AFTER the failure comes too late.
+# since attempts to remove it AFTER the failure may come too late.
 - name: apply iptables ruleset
   shell: >
     (
       set -e
       iptables-restore {{ '' if iptables_apply__action != 'template' or
-                          iptables_apply__noflush|bool != True else '--noflush' }} {{ iptables_apply__path_buffer }}
+                          iptables_apply__noflush|bool != True or
+                          ( check_rule is defined and check_rule is changed )
+                          else '--noflush' }} {{ iptables_apply__path_buffer }}
       rm -f {{ iptables_apply__path_buffer }}
       i=0
       while test $i -lt {{ iptables_apply__timeout|int }}; do

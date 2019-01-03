@@ -5,16 +5,6 @@
 
 
 ################################################################################
-# iptables_apply__noflush
-#
-# If `True`, current iptables rules are not flushed, and so they'll still be
-# applied to packets not matching any rule from the template.  Default is
-# `false`.
-#
-iptables_apply__noflush: false
-
-
-################################################################################
 # iptables_apply__persist
 #
 # Whether or not to make the currently applied ruleset persistent across
@@ -32,6 +22,24 @@ iptables_apply__persist: true
 #
 iptables_apply__service_enabled: true
 iptables_apply__service_started: true
+
+
+################################################################################
+# iptables_apply__noflush
+#
+# If `True`, current iptables rules are not flushed, and so they'll still be
+# applied to packets not matching any rule from the template.  Default is
+# `false`.
+#
+# This variable will be silently ignored, when set to `true`, if the current
+# rules already contain the templated rules (at least a marker).
+#
+# For the record: this variable is not called `iptables_apply__template_noflush`
+# because it refers to the iptables-restore's `--noflush` option, not to the
+# content of the template, as do the iptables_apply__template_* options. But it
+# may change soon.
+#
+iptables_apply__noflush: false
 
 
 ################################################################################

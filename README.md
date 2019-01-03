@@ -128,15 +128,6 @@ iptables_apply__timeout: 20
 
 ### Advanced Variables
 
-* If `True`, current iptables ruleset is not flushed and rules from the template
-  (the one shipped with the role) are **inserted** before the current ones. This
-  value should not be changed unless `iptables_apply__action` is `template`.
-  This is for one-shots (the more you use it, the more you duplicate the rules).
-
-```yaml
-iptables_apply__noflush: false
-```
-
 * Whether or not to make the currently applied ruleset persistent across
   reboots.
 
@@ -193,6 +184,17 @@ iptables_apply__template_rules: "{{ iptables_apply__rules }}"
 ```
 
 ### Advanced Templating
+
+* If `True`, current iptables ruleset is not flushed and rules from the template
+  (the one shipped with the role) are **inserted** before the current ones. This
+  variable is silently ignored if the current running state of iptables already
+  contains `iptables_apply__template_mark`'s value, that makes it usable as a
+  one-shot-option, avoiding to duplicate rules too much (thus, without modifying
+  the playbook nor its commandline call).
+
+```yaml
+iptables_apply__noflush: false
+```
 
 * Whether or not to apply the core ruleset provided by the template. The core
   rules, a.k.a. sanity rules, are inserted to ensure they will be evaluated
