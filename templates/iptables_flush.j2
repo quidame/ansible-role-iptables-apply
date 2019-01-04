@@ -1,4 +1,6 @@
 # {{ ansible_managed }}
+# role: {{ role_name }}
+# {{ iptables_apply__action }}
 
 {#-
   This is a template to flush iptables entirely or partially, in a per-table
@@ -10,7 +12,8 @@
 
   The variable `iptables_apply__flush_tables` accepts either a single keyword
   (a table name among 'filter', 'mangle', 'nat', 'raw' and 'security', or 'all')
-  or a list of these keywords. Unsupported keywords are silently ignored.
+  or a list of these keywords. Keywords are not checked by ansible itself before
+  templating, but iptables-restore will do in the `validate` parameter.
 
   ## Examples
 
