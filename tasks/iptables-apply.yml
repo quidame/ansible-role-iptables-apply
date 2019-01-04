@@ -5,7 +5,7 @@
 # Also, by using the temporary backup file as a cookie (absent/present), we can
 # either roll back or validate the rules and in the same time cleanup the file,
 # since attempts to remove it AFTER the failure may come too late.
-- name: apply iptables ruleset
+- name: 1. apply iptables ruleset in background
   shell: >
     (
       set -e
@@ -31,59 +31,54 @@
 # iptables rule such as:
 # -A INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 # may still accept ansible connections... for the entire playbook and no more.
+#
 # Depending on the ansible version, the 'reset_connection' (new in 2.3) is
 # buggy. Anyway, a meta task error can't be bypassed in a block, so we have
 # to prepend the meta by another task that will trigger the error to prevent
 # the meta error.
 - block:
-    - name: check ansible version and reset connection
+    - name: 2. reset ssh connection
       assert:
         that:
           - ansible_connection == 'ssh'
           - ansible_version.full is version_compare( '2.5.6', '>=' )
+
     - meta: reset_connection
+
   rescue:
-    - name: so, force connection with paramiko instead
+    - name: 2b. force paramiko connection instead
       set_fact:
-        ansible_connection: paramiko
-        force_connection_plugin: yes
-      when: ansible_connection == 'ssh'
-
-
-# We should never get a connection error (UNREACHABLE) since the rollback, if
-# any, has a shorter timeout than the connection.
-- name: wait for NEW connection
-  wait_for_connection:
-    timeout: "{{ iptables_apply__timeout|int + 5 }}"
+        connection_plugin: paramiko
 
 
 # If the cookie doesn't exist, it means initial ruleset has been restored,
 # and it shouln't. If it exists, it means we have to remove it to avoid the
-# rollback.
+# rollback.  Last but not least, the task that removes the cookie MUST be the
+# first task to attempt to connect to the target.  The `wait_for_connection`
+# module is unusable here, since if a host is unreachable before the rollback,
+# the next task comes too late for all other hosts: rollbacks already happened
+# on all of them, whatever safe or not the applied ruleset was.
 - block:
-    - name: confirm applied ruleset to avoid rollback (file-based implementation)
+    - name: 3. confirm applied ruleset to avoid rollback
       file:
         path: "{{ iptables_apply__path_backup }}"
         state: absent
       register: confirm
       failed_when: confirm is not changed
+      connection: "{{ connection_plugin | default('ssh') }}"
+      vars:
+        # Adding a few seconds is enough for ssh plugin to not get 'unreachable'
+        # state, but for whatever reason, it is harder for paramiko to wait for
+        # connection.
+        ansible_timeout: "{{ iptables_apply__timeout|int * 2 }}"
 
     - name: SUCCESS
       debug:
-        msg: "{{ msg_success }}"
-
-    - name: restore connection plugin
-      set_fact:
-        ansible_connection: ssh
-      when: force_connection_plugin is defined
+        msg: "The new iptables ruleset has been applied successsfully."
 
   rescue:
     - name: FAILURE
       debug:
-        msg: "{{ msg_failure }}"
+        msg: "The iptables rollback occured before the NEW connection."
       failed_when: true
-
-  vars:
-    msg_success: "The new iptables ruleset has been applied successfully !"
-    msg_failure: "The iptables rollback occured before the NEW connection."
 
