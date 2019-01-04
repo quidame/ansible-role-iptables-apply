@@ -3,8 +3,38 @@
 # so, flush the filter table.
 - hosts: all
   become: yes
+  vars:
+    iptables_apply__template_rules:
+      - { name: SNMP/TCP, dport: 161 }
+      - { name: SNMP/UDP, dport: 161, protocol: udp }
+      - { name: NRPE, dport: 5666 }
+    iptables_apply__rules:
+      - { name: SSH, dport: "{{ ansible_port | default(22) }}" }
+      - { name: HTTP/HTTPS, dport: 80,443 }
+
+  pre_tasks:
+    - name: install package
+      apt:
+        name: iptables-persistent
+        state: present
+      when: ansible_os_family|lower == "debian"
+
+    - name: install package
+      yum:
+        name: iptables
+        state: present
+      when: ansible_os_family|lower == "redhat"
+
   roles:
     - role: iptables_apply
+    - role: iptables_apply
+      iptables_apply__action: append
+    - role: iptables_apply
+      iptables_apply__action: delete
+      iptables_apply__rules:
+        - { name: NRPE, dport: 5666 }
+    - role: iptables_apply
+
   tasks:
     - name: attempt and gracefull rollback demo
       block:
@@ -12,9 +42,6 @@
             name: iptables_apply
           vars:
             iptables_apply__action: delete
-            iptables_apply__rules:
-              - name: SSH
-                dport: "{{ ansible_port | default(22) }}"
       rescue:
         - include_role:
             name: iptables_apply
