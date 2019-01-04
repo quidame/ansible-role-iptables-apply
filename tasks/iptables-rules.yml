@@ -31,6 +31,13 @@
       rule.name|regex_replace('^|$', '\"') if rule.name|wordcount != 1 else rule.name }} -j {{
       rule.jump|default('ACCEPT') }}"
     state: "{{ 'absent' if iptables_apply__action == 'delete' else 'present' }}"
+    # `insertafter` and `insertbefore` are mutually exclusive, so 'omit' one of
+    # them is mandatory. In the filter table, all rules take place between the
+    # ':OUTPUT' policy and the 'COMMIT' instruction, that are the only marks to
+    # ensure that a given rule is actually inserted (BEFORE the first rule)
+    # when action is `insert`, or appended (AFTER the last rule) when action is
+    # `append`, and left unchanged if already there. Other formula, and the use
+    # of `firstmatch` may lead to duplicated rules and/or lack of idempotency.
     insertafter: "{{ '^:OUTPUT' if iptables_apply__action == 'insert' else omit }}"
     insertbefore: "{{ '^COMMIT' if iptables_apply__action == 'append' else omit }}"
     validate: "iptables-restore --test %s"
@@ -40,7 +47,9 @@
   register: iptables_ruleset
 
 
-- name: cleanup temporary backup and buffer (planning to skip further tasks)
+# If the buffer is not modified, it remains the same than the backup, so the
+# next step will be skipped and these files will not be removed. Do it here.
+- name: remove temporary backup and buffer
   file:
     path: "{{ tmpfile }}"
     state: absent
