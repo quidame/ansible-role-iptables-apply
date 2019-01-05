@@ -19,7 +19,7 @@
     validate: "iptables-restore --test %s"
   register: iptables_ruleset
   when:
-    - ( iptables_apply__template_once|default(True)|bool == False ) or
+    - ( iptables_apply__template_once|bool == False ) or
       ( check_rule is not changed )
 
 
