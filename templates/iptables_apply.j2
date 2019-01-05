@@ -52,7 +52,7 @@
   Application-specific rules, generally to **ACCEPT** given port(s) on filter's
   **INPUT** chain and **tcp** protocol.
 #}
-{% for rule in iptables_apply__template_rules|default([]) %}
+{% for rule in iptables_apply__template_rules %}
 -A {{ rule.chain|default('INPUT') }} -p {{ rule.protocol|default('tcp') }}
 {%- if ',' in rule.dport|string %} -m multiport --dports {% else %} -m {{ rule.protocol|default('tcp') }} --dport {% endif %}
 {{ rule.dport }} -m comment --comment "{{ rule.name }}" -j {{ rule.jump|default('ACCEPT') }}
