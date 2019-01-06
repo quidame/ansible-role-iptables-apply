@@ -45,8 +45,8 @@
     enabled: "{{ service.enabled }}"
     state: "{{ service.state }}"
   loop:
-    - { enabled: "{{ iptables_apply__service_enabled|bool }}",
-        state: "{{ 'started' if iptables_apply__service_started|bool else 'stopped' }}" }
+    - { enabled: "{{ false if iptables_apply__action == 'flush' else iptables_apply__service_enabled|bool }}",
+        state: "{{ 'stopped' if iptables_apply__action == 'flush' or iptables_apply__service_started|bool else 'stopped' }}" }
   loop_control:
     loop_var: service
 

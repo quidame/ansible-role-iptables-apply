@@ -1,18 +1,4 @@
 ---
-# If you don't really want to flush your iptables, use another action than
-# `flush`.
-- name: force values for further tasks
-  set_fact:
-    # Even if it is its default value, ensure to use THIS value:
-    iptables_apply__persist: true
-    # The rationale is that if we flush the tables, the service should be
-    # disabled, so basic monitoring tools may be aware of that. Parsing the
-    # rules is a little bit more complicated (but maybe parsing the INPUT
-    # policy could be sufficient) to determine if there is a firewall.
-    iptables_apply__service_enabled: false
-    iptables_apply__service_started: false
-
-
 - name: delete all rules and reset policies to 'ACCEPT' for all chains
   template:
     src: "{{ iptables_apply__flush }}"
