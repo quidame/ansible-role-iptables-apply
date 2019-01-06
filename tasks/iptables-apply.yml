@@ -13,7 +13,10 @@
                           else '' }} {{ iptables_apply__path_buffer }}
       rm -f {{ iptables_apply__path_buffer }}
       i=0
-      while test $i -lt {{ iptables_apply__timeout|int }}; do
+      while test $i -lt {% if iptables_apply__timeout|int > 60 %}60{%
+                           elif iptables_apply__timeout|int < 5 %}5{%
+                           else %}{{ iptables_apply__timeout|int }}{%
+                           endif %}; do
         sleep 1; i=$((i+1))
         test -e {{ iptables_apply__path_backup }} || exit 0
       done
