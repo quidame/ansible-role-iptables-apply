@@ -7,6 +7,7 @@
     tee {{ iptables_apply__path_backup }} {{
            iptables_apply__path_buffer if iptables_apply__action not in ['template','flush'] else ''
         }}
+  changed_when: true
 
 
 # Do all the stuff using a template, or just delete/append/insert/update rules.
@@ -46,7 +47,8 @@
     state: "{{ service.state }}"
   loop:
     - { enabled: "{{ false if iptables_apply__action == 'flush' else iptables_apply__service_enabled|bool }}",
-        state: "{{ 'stopped' if iptables_apply__action == 'flush' or not iptables_apply__service_started|bool else 'started' }}" }
+        state: "{{ 'stopped' if iptables_apply__action == 'flush' or not iptables_apply__service_started|bool
+                   else 'started' }}" }
   loop_control:
     loop_var: service
 

@@ -8,7 +8,7 @@
 - name: 1. apply iptables ruleset and wait for confirmation
   shell: >
     (
-      iptables-restore {{ '--noflush' if iptables_apply__noflush|bool == True and
+      iptables-restore {{ '--noflush' if iptables_apply__noflush|bool and
                           check_rule is defined and check_rule is not changed
                           else '' }} {{ iptables_apply__path_buffer }}
       rm -f {{ iptables_apply__path_buffer }}
@@ -25,6 +25,7 @@
     ) &
   async: 1
   poll: 0
+  changed_when: true
 
 
 # If the cookie doesn't exist, it means initial ruleset has been restored,

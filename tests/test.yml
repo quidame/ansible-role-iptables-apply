@@ -10,12 +10,20 @@
         name: iptables-persistent
         state: present
       when: ansible_os_family|lower == "debian"
+      register: install
+      retries: 3
+      delay: 5
+      until: install is succeeded
 
     - name: install package
       yum:
         name: iptables
         state: present
       when: ansible_os_family|lower == "redhat"
+      register: install
+      retries: 3
+      delay: 5
+      until: install is succeeded
 
   roles:
     - role: iptables_apply # ACTION: flush
@@ -90,7 +98,8 @@
             iptables_apply__template_once: false
           register: rescue
 
-    - fail:
+    - name: "fail if iptables didn't roll back"
+      fail:
         msg: "An expected rollback didn't happen."
       when: rescue is not defined
 
