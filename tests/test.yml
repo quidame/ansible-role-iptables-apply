@@ -1,16 +1,8 @@
+# Play the role as many times as needed to test every action and at least one
+# ruleset that leads to roll back to the last one.
 ---
-# Play the role all crude, close SSH port to trigger a failure/rollback and if
-# so, flush the filter table.
-- hosts: all
+- hosts: tests
   become: yes
-  vars:
-    iptables_apply__template_rules:
-      - { name: SNMP/TCP, dport: 161 }
-      - { name: SNMP/UDP, dport: 161, protocol: udp }
-      - { name: NRPE, dport: 5666 }
-    iptables_apply__rules:
-      - { name: SSH, dport: "{{ ansible_port | default(22) }}" }
-      - { name: HTTP/HTTPS, dport: 80,443 }
 
   pre_tasks:
     - name: install package
@@ -26,24 +18,93 @@
       when: ansible_os_family|lower == "redhat"
 
   roles:
-    - role: iptables_apply
-    - role: iptables_apply
+    - role: iptables_apply # ACTION: flush
+      iptables_apply__action: flush
+
+  tasks:
+    - name: validate 'flush' action
+      systemd:
+        name: "{{ iptables_apply__service }}"
+        enabled: false
+        state: stopped
+      register: service_status
+      failed_when: service_status is changed
+
+
+- hosts: tests
+  become: yes
+  vars:
+    iptables_apply__template_rules:
+      - { name: "SNMP/TCP", dport: "161" }
+      - { name: "SNMP/UDP", dport: "161", protocol: "udp" }
+      - { name: "NRPE", dport: "5666" }
+
+  roles:
+    - role: iptables_apply # ACTION: template
+
+  tasks:
+    - name: validate templated ruleset
+      # That should be enough to state that a firewall is in place
+      shell: iptables-save -t filter | grep -E '^:INPUT DROP'
+      changed_when: false
+
+    - name: validate 'template' action
+      systemd:
+        name: "{{ iptables_apply__service }}"
+        enabled: true
+        state: started
+      register: service_status
+      failed_when: service_status is changed
+
+
+- hosts: tests
+  become: yes
+  vars:
+    iptables_apply__rules:
+      - { name: "SSH", dport: "{{ ansible_port | default(22) }}" }
+      - { name: "HTTP/HTTPS", dport: "80,443" }
+
+  roles:
+    - role: iptables_apply # ACTION: append
       iptables_apply__action: append
-    - role: iptables_apply
+    - role: iptables_apply # ACTION: insert (same rules as before: idempotent)
+      iptables_apply__action: insert
+    - role: iptables_apply # ACTION: delete
       iptables_apply__action: delete
       iptables_apply__rules:
-        - { name: NRPE, dport: 5666 }
+        - { name: "NRPE", dport: "5666" }
     - role: iptables_apply
 
   tasks:
     - name: attempt and gracefull rollback demo
       block:
         - include_role:
-            name: iptables_apply
+            name: iptables_apply # ACTION: delete (MUST FAIL)
           vars:
             iptables_apply__action: delete
       rescue:
         - include_role:
-            name: iptables_apply
+            name: iptables_apply # ACTION: template (flush again, but keep service running)
           vars:
-            iptables_apply__action: flush
+            iptables_apply__template: iptables_flush.j2
+            iptables_apply__template_once: false
+          register: rescue
+
+    - fail:
+        fail_msg: "An expected rollback didn't happen."
+      when: rescue is not defined
+
+    - name: validate templated ruleset
+      shell: iptables-save -t filter | grep -E '^(:.*) (DROP|REJECT)|\<{{ ansible_port|default(22) }}\>'
+      register: grep
+      changed_when: false
+      failed_when: grep.rc == 0
+
+    - name: validate 'template' action
+      systemd:
+        name: "{{ iptables_apply__service }}"
+        enabled: true
+        state: started
+      register: service_status
+      failed_when: service_status is changed
+
