@@ -91,11 +91,11 @@
           register: rescue
 
     - fail:
-        fail_msg: "An expected rollback didn't happen."
+        msg: "An expected rollback didn't happen."
       when: rescue is not defined
 
     - name: validate templated ruleset
-      shell: iptables-save -t filter | grep -E '^(:.*) (DROP|REJECT)|\<{{ ansible_port|default(22) }}\>'
+      shell: iptables-save -t filter | grep -E '^((:.*) (DROP|REJECT))|\<{{ ansible_port|default(22) }}\>.* ACCEPT'
       register: grep
       changed_when: false
       failed_when: grep.rc == 0
