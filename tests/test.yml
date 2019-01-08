@@ -2,12 +2,10 @@
 # ruleset that leads to roll back to the last one.
 ---
 ################################################################################
-- name: TEST ACTION 'FLUSH'
+- name: PREPARE THE FIELD
   hosts: tests
   become: yes
-  connection: ssh
-
-  pre_tasks:
+  tasks:
     - name: install package
       apt:
         name: iptables-persistent
@@ -39,6 +37,12 @@
         to_delete:
           - name: SSH
             dport: "{{ ansible_port|default(22) }}"
+        to_update:
+          - name: SNMP
+            dport: 161
+          - name: SNMP
+            dport: 161
+            protocol: udp
         iptables_apply__template_rules:
           - name: monitoring
             dport: 161,5666
@@ -46,6 +50,12 @@
             dport: 161
             protocol: udp
 
+
+################################################################################
+- name: TEST ACTION 'FLUSH'
+  hosts: tests
+  become: yes
+  connection: ssh
   roles:
     - role: iptables_apply
       iptables_apply__action: flush
@@ -388,13 +398,14 @@
     - name: check rule to change is there
       shell: >
         iptables-save -t filter |
-        grep -Ee '-A INPUT -p tcp .*\<161,5666\>.*\<monitoring\>.* -j ACCEPT'
+        grep -Ee '-A INPUT -p tcp .*\<{{ iptables_apply__template_rules[0].dport
+                              }}\>.*\<{{ iptables_apply__template_rules[0].name }}\>.* -j ACCEPT'
       changed_when: false
 
     - name: check rule to obtain is not there
       shell: >
         iptables-save -t filter |
-        grep -Ee '-A INPUT -p tcp .*\<161\>.*\<SNMP\>.* -j ACCEPT'
+        grep -Ee '-A INPUT -p tcp .*\<{{ to_update[0].dport }}\>.*\<{{ to_update[0].name }}\>.* -j ACCEPT'
       register: grep
       failed_when: grep.rc == 0
       changed_when: false
@@ -402,13 +413,14 @@
     - name: check rule to change is there
       shell: >
         iptables-save -t filter |
-        grep -Ee '-A INPUT -p udp .*\<161\>.*\<monitoring\>.* -j ACCEPT'
+        grep -Ee '-A INPUT -p udp .*\<{{ iptables_apply__template_rules[1].dport
+                              }}\>.*\<{{ iptables_apply__template_rules[1].name }}\>.* -j ACCEPT'
       changed_when: false
 
     - name: check rule to obtain is not there
       shell: >
         iptables-save -t filter |
-        grep -Ee '-A INPUT -p udp .*\<161\>.*\<SNMP\>.* -j ACCEPT'
+        grep -Ee '-A INPUT -p tcp .*\<{{ to_update[0].dport }}\>.*\<{{ to_update[0].name }}\>.* -j ACCEPT'
       register: grep
       failed_when: grep.rc == 0
       changed_when: false
@@ -429,7 +441,10 @@
     - name: check rules to change are not there
       shell: >
         iptables-save -t filter |
-        grep -Ee '-A INPUT -p (tcp|udp) .*\<(5666|monitoring)\>.* -j ACCEPT'
+        grep -Ee '-A INPUT -p (tcp|udp) .* ({{ iptables_apply__template_rules[0].dport
+                                     }} .*\<{{ iptables_apply__template_rules[0].name
+                                     }}\>)|({{ iptables_apply__template_rules[1].dport
+                                     }} .*\<{{ iptables_apply__template_rules[1].name }}\>).* -j ACCEPT'
       register: grep
       failed_when: grep.rc == 0
       changed_when: false
