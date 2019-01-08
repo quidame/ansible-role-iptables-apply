@@ -317,15 +317,19 @@
             iptables_apply__action: delete
             iptables_apply__rules: "{{ to_insert }}"
       rescue:
-        - name: SUCCESSFULLY PASSED TEST OF ROLLBACK FOR ACTION 'DELETE'
-          pause:
-            seconds: 5
+        - name: expected error
+          debug:
+            msg: "A rollback occured when trying to delete a needed rule"
           register: rollback_delete
 
     - name: fail if role succeeded
       fail:
         msg: "There is some unexpected issue in rollback feature"
       when: rollback_delete is undefined
+
+    - name: SUCCESSFULLY PASSED TEST OF ROLLBACK FOR ACTION 'DELETE'
+      pause:
+        seconds: 5
 
     - name: test rollback after bad 'insert'
       block:
@@ -336,15 +340,19 @@
             iptables_apply__rules: |
               [ {{ to_delete[0] | combine({"jump":"DROP"}) }} ]
       rescue:
-        - name: SUCCESSFULLY PASSED TEST OF ROLLBACK FOR ACTION 'INSERT'
-          pause:
-            seconds: 5
+        - name: expected error
+          debug:
+            msg: "A rollback occured when trying to insert a blocking rule"
           register: rollback_insert
 
     - name: fail if role succeeded
       fail:
         msg: "There is some unexpected issue in rollback feature"
       when: rollback_insert is undefined
+
+    - name: SUCCESSFULLY PASSED TEST OF ROLLBACK FOR ACTION 'INSERT'
+      pause:
+        seconds: 5
 
     - name: test rollback after bad 'template'
       block:
@@ -354,15 +362,19 @@
             iptables_apply__template_once: no
             iptables_apply__template_core: no
       rescue:
-        - name: SUCCESSFULLY PASSED TEST OF ROLLBACK FOR ACTION 'TEMPLATE'
-          pause:
-            seconds: 5
+        - name: expected error
+          debug:
+            msg: "A rollback occured when trying to restore bad ruleset from template"
           register: rollback_template
 
     - name: fail if role succeeded
       fail:
         msg: "There is some unexpected issue in rollback feature"
       when: rollback_template is undefined
+
+    - name: SUCCESSFULLY PASSED TEST OF ROLLBACK FOR ACTION 'TEMPLATE'
+      pause:
+        seconds: 5
 
 
 ################################################################################
@@ -428,14 +440,9 @@
   roles:
     - role: iptables_apply
       iptables_apply__action: append
-      iptables_apply__rules:
-        - name: monitoring
-          dport: 161
-        - name: SNMP
-          dport: 161
-        - name: SNMP
-          dport: 161
-          protocol: udp
+      iptables_apply__rules: "{{
+        [ { 'name': iptables_apply__template_rules[0].name, 'dport': to_update[0].dport } ] + to_update
+        }}"
 
   tasks:
     - name: check rules to change are not there
@@ -452,13 +459,13 @@
     - name: check rule to obtain is there
       shell: >
         iptables-save -t filter |
-        grep -Ee '-A INPUT -p tcp .*\<161\>.*\<SNMP\>.* -j ACCEPT'
+        grep -Ee '-A INPUT -p tcp .*\<{{ to_update[0].dport }}\>.*\<{{ to_update[0].name }}\>.* -j ACCEPT'
       changed_when: false
 
     - name: check rule to obtain is there
       shell: >
         iptables-save -t filter |
-        grep -Ee '-A INPUT -p udp .*\<161\>.*\<SNMP\>.* -j ACCEPT'
+        grep -Ee '-A INPUT -p udp .*\<{{ to_update[1].dport }}\>.*\<{{ to_update[1].name }}\>.* -j ACCEPT'
       changed_when: false
 
     - name: SUCCESSFULLY PASSED TEST FOR RULE UPDATE BY ACTION 'APPEND'
