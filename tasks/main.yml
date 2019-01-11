@@ -23,7 +23,26 @@
     tee {{ iptables_apply__path_backup }} {{
            iptables_apply__path_buffer if iptables_apply__action not in ['template','flush'] else ''
         }}
+  register: saved_state
   changed_when: true
+
+
+# If the output of iptables-save is empty, then the backup file will be of no
+# help if time comes to restore the previous ruleset, i.e. nothing.
+- name: create basic ruleset if empty
+  blockinfile:
+    path: "{{ ruleset }}"
+    block: |
+      *filter
+      :INPUT ACCEPT
+      :FORWARD ACCEPT
+      :OUTPUT ACCEPT
+      COMMIT
+  loop: "{{ [iptables_apply__path_backup] + ( [iptables_apply__path_buffer]
+        if iptables_apply__action not in ['template','flush'] else [] ) }}"
+  loop_control:
+    loop_var: ruleset
+  when: saved_state.stdout == ''
 
 
 # Do all the stuff using a template, or just delete/append/insert/update rules.
