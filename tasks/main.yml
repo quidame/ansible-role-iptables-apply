@@ -24,9 +24,7 @@
 
 # Save applied ruleset so it will be applied again after reboot.
 - name: confirm applied ruleset as persistent
-  command: "service {{ iptables_apply__service }} save"
-  args:
-    warn: no
+  include_tasks: iptables-persist.yml
   when:
     - iptables_ruleset is defined
     - iptables_ruleset is changed
