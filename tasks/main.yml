@@ -34,14 +34,4 @@
 # And finally, ensure the service is started and enabled (or not). The use of
 # a loop for only one item is to display each attribute of the item.
 - name: manage firewall service state and activation
-  systemd:
-    name: "{{ iptables_apply__service }}"
-    enabled: "{{ service.enabled }}"
-    state: "{{ service.state }}"
-  loop:
-    - { enabled: "{{ false if iptables_apply__action == 'flush' else iptables_apply__service_enabled|bool }}",
-        state: "{{ 'stopped' if iptables_apply__action == 'flush' or not iptables_apply__service_started|bool
-                   else 'started' }}" }
-  loop_control:
-    loop_var: service
-
+  include_tasks: iptables-service.yml
