@@ -1,2 +1,2 @@
 ---
-- import_tasks: iptables-rules.yml
+- import_tasks: iptables-ruleset.yml
