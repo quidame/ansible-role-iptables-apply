@@ -25,7 +25,7 @@
 
 # Tasks in iptables-apply.yml need this file and will remove it. But when
 # iptables_ruleset is not changed, they will be skipped.
-- name: cleanup temporary backup (planning to skip further tasks)
+- name: remove temporary backup
   file:
     path: "{{ iptables_apply__path_backup }}"
     state: absent
