@@ -18,7 +18,6 @@
 - name: apply and validate iptables ruleset
   include_tasks: iptables-apply.yml
   when:
-    - iptables_ruleset is defined
     - iptables_ruleset is changed
 
 
@@ -26,7 +25,6 @@
 - name: confirm applied ruleset as persistent
   include_tasks: iptables-persist.yml
   when:
-    - iptables_ruleset is defined
     - iptables_ruleset is changed
     - iptables_apply__persist|bool
 
