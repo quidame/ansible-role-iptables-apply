@@ -9,7 +9,7 @@
   shell: >
     (
       iptables-restore {{ '--noflush' if iptables_apply__noflush|bool and
-                          check_rule is defined and check_rule is not changed
+                          check_rule is defined and check_rule is changed
                           else '' }} {{ iptables_apply__path_buffer }}
       rm -f {{ iptables_apply__path_buffer }}
       i=0

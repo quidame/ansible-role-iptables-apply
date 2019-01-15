@@ -1,11 +1,26 @@
 ---
-# This is not very good...
-- name: check that templated rules are not already in use
+# We can state that a firewall is set with only one criterion:
+# INPUT chain has a DROP default policy.  If we are polite, we will left it
+# unmodified. By default we don't.
+- name: check if a consistent ruleset is in already in use
   check_mode: true
-  lineinfile:
-    path: "{{ iptables_apply__path_backup }}"
-    regexp: "{{ iptables_apply__template_mark }}"
-    state: absent
+  iptables:
+    chain: INPUT
+    policy: DROP
+  register: policy
+
+
+- name: check if templated rules are in use
+  check_mode: true
+  iptables:
+    chain: INPUT
+    ctstate: NEW
+    protocol: tcp
+    match: tcp
+    syn: negate
+    comment: "{{ iptables_apply__template_mark }}"
+    jump: DROP
+    state: present
   register: check_rule
 
 
@@ -19,8 +34,8 @@
     validate: "iptables-restore --test %s"
   register: iptables_ruleset
   when:
-    - ( iptables_apply__template_once|bool == False ) or
-      ( check_rule is not changed )
+    - ( policy is changed ) or ( not iptables_apply__template_once|bool ) or
+      ( policy is not changed and check_rule is changed )
 
 
 # Tasks in iptables-apply.yml need this file and will remove it. But when
