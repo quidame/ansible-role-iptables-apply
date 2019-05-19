@@ -14,7 +14,6 @@
   check_mode: true
   iptables:
     chain: INPUT
-    ctstate: NEW
     protocol: tcp
     match: tcp
     syn: negate
