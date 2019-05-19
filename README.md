@@ -50,6 +50,15 @@ Requirements
 Firewall management service (`iptables` or `netfilter-persistent`) must be
 installed apart.
 
+With Ansible version prior to `2.5.6`, a control socket MUST be set either in
+`ANSIBLE_SSH_ARGS` environment variable, or in `ssh_args` setting of the
+`[ssh_connection]` in `ansible.cfg`. For example:
+
+```ini
+[ssh_connection]
+ssh_args = -o ControlMaster=auto
+```
+
 Role Variables
 --------------
 
