@@ -10,4 +10,3 @@
                    else 'started' }}" }
   loop_control:
     loop_var: service
-

@@ -45,4 +45,3 @@
     path: "{{ iptables_apply__path_backup }}"
     state: absent
   when: iptables_ruleset is not changed
-
