@@ -12,21 +12,23 @@
       apt:
         name: iptables-persistent
         state: present
-      when: ansible_os_family|lower == "debian"
       register: install
       retries: 3
       delay: 5
       until: install is succeeded
+      when:
+        - ansible_os_family|lower in ["debian"]
 
     - name: install package
       yum:
         name: iptables
         state: present
-      when: ansible_os_family|lower == "redhat"
       register: install
       retries: 3
       delay: 5
       until: install is succeeded
+      when:
+        - ansible_os_family|lower in ["redhat"]
 
     - name: preset rules to append, insert, delete or template
       set_fact:
@@ -48,48 +50,9 @@
 
 
 ################################################################################
-# Ensure the role will fail if unable to switch to paramiko on the fly, when
-# required.  This makes that a possible rollback is not bypassed by the reuse
-# of a previously ESTABLISHED connection.
-- name: "01. TEST ROBUSTNESS AGAINST BAD CONNECTION PLUGIN OVERRIDES"
-  hosts: tests
-  become: yes
-  # This is good (as below):
-  #connection: ssh
-  # This is bad:
-  vars:
-    ansible_connection: ssh
-
-  tasks:
-    - name: attempt and gracefull robustness demo
-      block:
-        - include_role:
-            name: iptables_apply
-      rescue:
-        - name: previous task failed (expected)
-          debug:
-            msg: >
-              The previous task failed because of a bad connection plugin override.
-              The failure is expected when the connection is unable to be switched
-              to paramiko, and it prevents a fatal 'oops no-rollback' error.
-          register: connection_plugin_override
-
-    - name: fail if role succeeded
-      fail:
-        msg: >
-          The previous role play should have failed because of a bad connection
-          plugin override (in play vars).
-      when: connection_plugin_override is undefined
-
-    - name: "SUCCESSFULLY PASSED TEST: BAD CONNECTION PLUGIN OVERRIDES"
-      pause:
-        seconds: 5
-
-
-################################################################################
 # Ensure that if a rollback is triggered, the ruleset to restore is not empty.
 # This tests that the backed up ruleset is not empty.
-- name: "02. TEST INITIALIZATION FROM NULL STATE"
+- name: "01. TEST INITIALIZATION FROM NULL STATE"
   hosts: tests
   become: yes
   tasks:
@@ -135,7 +98,7 @@
 ################################################################################
 # Ensure that the default action does something consistent: the default INPUT
 # policy **MUST** be `DROP`, and the service **MUST** be started and enabled.
-- name: "03. TEST ACTION 'TEMPLATE'"
+- name: "02. TEST ACTION 'TEMPLATE'"
   hosts: tests
   become: yes
   roles:
@@ -178,7 +141,7 @@
 
 ################################################################################
 # Ensure the default action is idempotent.
-- name: "04. TEST INDEMPOTENCY OF ACTION 'TEMPLATE'"
+- name: "03. TEST INDEMPOTENCY OF ACTION 'TEMPLATE'"
   hosts: tests
   become: yes
   roles:
@@ -197,7 +160,7 @@
 
 ################################################################################
 # Ensure the parameter that forces to reapply the template is working.
-- name: "05. TEST OVERWRITE OF ACTION 'TEMPLATE'"
+- name: "04. TEST OVERWRITE OF ACTION 'TEMPLATE'"
   hosts: tests
   become: yes
   roles:
@@ -217,7 +180,7 @@
 
 ################################################################################
 # Ensure the most expected feature is working fine.
-- name: "06. TEST ROLLBACK OF ACTION 'TEMPLATE'"
+- name: "05. TEST ROLLBACK OF ACTION 'TEMPLATE'"
   hosts: tests
   become: yes
   tasks:
@@ -247,7 +210,7 @@
 ################################################################################
 # Ensure the 'flush' action does what is expected: flush rules, reset policies
 # and stop and disable the service.
-- name: "07. TEST ACTION 'FLUSH'"
+- name: "06. TEST ACTION 'FLUSH'"
   hosts: tests
   become: yes
   roles:
@@ -275,93 +238,11 @@
 
 
 ################################################################################
-# Ensure both that overriding ansible connection plugin with the play parameter
-# 'connection' doesn't affect the rollback feature, and that playing the role
-# doesn't affect ansible connection plugin overrides.
-- name: "08. TEST ROLLBACK WITH CONNECTION PLUGIN OVERRIDE (SSH)"
-  hosts: tests
-  become: yes
-  connection: ssh
-  tasks:
-    - name: validate connection plugin
-      fail:
-         msg: connection plugin is not the one that was expected
-      failed_when: ansible_connection != 'ssh'
-
-    - name: test rollback after bad 'template'
-      block:
-        - include_role:
-            name: iptables_apply
-          vars:
-            iptables_apply__template_core: no
-      rescue:
-        - name: expected error
-          debug:
-            msg: "A rollback occured when trying to apply bad ruleset from template"
-          register: rollback_template_ssh
-
-    - name: fail if role succeeded
-      fail:
-        msg: "There is some unexpected issue in rollback feature"
-      when: rollback_template_ssh is undefined
-
-    - name: validate connection plugin
-      fail:
-         msg: connection plugin is not the one that was expected
-      failed_when: ansible_connection != 'ssh'
-
-    - name: "SUCCESSFULLY PASSED TEST: ROLLBACK WITH CONNECTION PLUGIN OVERRIDE (SSH)"
-      pause:
-        seconds: 5
-
-
-################################################################################
-# Ensure both that overriding ansible connection plugin with the play parameter
-# 'connection' doesn't affect the rollback feature, and that playing the role
-# doesn't affect ansible connection plugin overrides.
-- name: "09. TEST ROLLBACK WITH CONNECTION PLUGIN OVERRIDE (PARAMIKO)"
-  hosts: tests
-  become: yes
-  connection: paramiko
-  tasks:
-    - name: validate connection plugin
-      fail:
-         msg: connection plugin is not the one that was expected
-      failed_when: ansible_connection != 'paramiko'
-
-    - name: test rollback after bad 'template'
-      block:
-        - include_role:
-            name: iptables_apply
-          vars:
-            iptables_apply__template_core: no
-      rescue:
-        - name: expected error
-          debug:
-            msg: "A rollback occured when trying to apply bad ruleset from template"
-          register: rollback_template_paramiko
-
-    - name: fail if role succeeded
-      fail:
-        msg: "There is some unexpected issue in rollback feature"
-      when: rollback_template_paramiko is undefined
-
-    - name: validate connection plugin
-      fail:
-         msg: connection plugin is not the one that was expected
-      failed_when: ansible_connection != 'paramiko'
-
-    - name: "SUCCESSFULLY PASSED TEST: ROLLBACK WITH CONNECTION PLUGIN OVERRIDE (PARAMIKO)"
-      pause:
-        seconds: 5
-
-
-################################################################################
 # Ensure single rule management actions are working as expected.  We dont check
 # service status here, but only the fact that a rule has been added or removed.
 # This sequence is a junglery that removes ssh-specific passing rule with no
 # error because another one does the job.
-- name: "10,11,12. TEST ACTIONS 'APPEND', 'INSERT' AND 'DELETE'"
+- name: "07,08,09. TEST ACTIONS 'APPEND', 'INSERT' AND 'DELETE'"
   hosts: tests
   become: yes
   pre_tasks:
@@ -470,7 +351,7 @@
 # always marked as changed, but the role doesn't attempt to apply the buffered
 # ruleset if it didn't changea.  This sequence also ensures that actions adding
 # rules (`append`, `insert`) are idempotent between them too.
-- name: "13,14,15. TEST INDEMPOTENCY OF ACTIONS 'APPEND', 'INSERT' AND 'DELETE'"
+- name: "10,11,12. TEST INDEMPOTENCY OF ACTIONS 'APPEND', 'INSERT' AND 'DELETE'"
   hosts: tests
   become: yes
   tasks:
@@ -546,7 +427,7 @@
 # Ensure the rollback feature works for every action.  Note that at this step,
 # there is no ssh-specific passing rule but a rule for ports 20:23.  The table
 # needs to be flushed before testing action 'append'.
-- name: "16,17,18. TEST ROLLBACK FOR ACTIONS 'DELETE', 'INSERT' AND 'APPEND'"
+- name: "13,14,15. TEST ROLLBACK FOR ACTIONS 'DELETE', 'INSERT' AND 'APPEND'"
   hosts: tests
   become: yes
   tasks:
@@ -627,7 +508,7 @@
 ################################################################################
 # Ensure the noflush option works, i.e. templated rules are applied and initial
 # rules are still there.
-- name: "19. TEST OPTION NOFLUSH OF ACTION 'TEMPLATE'"
+- name: "16. TEST OPTION NOFLUSH OF ACTION 'TEMPLATE'"
   hosts: tests
   become: yes
   roles:
@@ -662,7 +543,7 @@
 
 
 ################################################################################
-- name: "20. TEST ROLLBACK WHEN CHANGING POLICY"
+- name: "17. TEST ROLLBACK WHEN CHANGING POLICY"
   hosts: tests
   become: yes
   tasks:
@@ -695,7 +576,7 @@
 
 
 ################################################################################
-- name: "21,22. TEST ROLLBACK TIMEOUTS"
+- name: "18,19. TEST ROLLBACK TIMEOUTS"
   hosts: tests
   become: yes
   tasks:
@@ -750,7 +631,7 @@
 # Ensure it is possible to update several rules by playing the role only once,
 # even when neither the 'name' nor the 'dport' match between an old rule and a
 # new rule.
-- name: "23. TEST RULE UPDATE BY ACTION 'APPEND'"
+- name: "20. TEST RULE UPDATE BY ACTION 'APPEND'"
   hosts: tests
   become: yes
   vars:
