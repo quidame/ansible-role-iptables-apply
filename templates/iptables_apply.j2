@@ -37,11 +37,16 @@
 {% if iptables_apply__template_core|bool %}
 -I INPUT 1 -m conntrack --ctstate INVALID -j DROP
 -I INPUT 2 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+{#
+  There are only 4 userland states: the 3 above, and NEW. That means that any
+  packet that was not caught by the two previous rules is NEW, so it's useless
+  to specify this criteria in the next rules.
+#}
 -I INPUT 3 -i lo -m comment --comment "loopback" -j ACCEPT
 -I INPUT 4 -p icmp -m comment --comment "ICMP" -j ACCEPT
 -I INPUT 5 -p udp -m udp --sport :1023 -m comment --comment "bad source port" -j DROP
 -I INPUT 6 -p tcp -m tcp --sport :1023 -m comment --comment "bad source port" -j DROP
--I INPUT 7 -p tcp -m tcp ! --syn -m comment --comment "{{ iptables_apply__template_mark }}" -m conntrack --ctstate NEW -j DROP
+-I INPUT 7 -p tcp -m tcp ! --syn -m comment --comment "{{ iptables_apply__template_mark }}" -j DROP
 -I INPUT 8 -p tcp -m tcp --dport {{ ansible_port|default(22) }} -m comment --comment "SSH" -j ACCEPT
 
 -I OUTPUT 1 -m conntrack --ctstate INVALID -j DROP
