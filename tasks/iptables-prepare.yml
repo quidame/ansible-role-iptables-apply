@@ -1,20 +1,4 @@
 ---
-# A connection plugin override at task level is used to open a NEW connection
-# right after a new ruleset is applied, and this NEW connection is used to
-# validate the new ruleset, i.e. remove a file to avoid the rollback by the
-# previous task (a shell script running in background).  We ensure here that
-# when we say 'paramiko', it is 'paramiko'. Cases of failure can be:
-# - paramiko is not supported (?)
-# - ansible_connection is set to something else than paramiko from commandline
-#   (--extra-vars ansible_connection=ssh) or from the playbook, for example
-#   with the `set_fact` module or in play or task vars, etc.
-- name: check for connection plugin overrides
-  fail:
-    msg: "Unable to switch to 'paramiko' connection plugin."
-  connection: paramiko
-  failed_when: ansible_connection != 'paramiko'
-
-
 # Initialize iptables so the output of iptables-save will not be empty.
 # Otherwise, rolling back to previous state will not work when restoring this
 # state from nothing. This shell task is idempotent. It plays with the exit
@@ -41,4 +25,3 @@
   register: saved_state
   changed_when: true
   failed_when: saved_state.stdout_lines == []
-

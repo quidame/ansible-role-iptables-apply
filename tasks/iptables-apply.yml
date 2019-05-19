@@ -28,6 +28,17 @@
   changed_when: true
 
 
+# reset_connection raises an unmanageable error when used with paramiko. This
+# meta task doesn't support 'when' conditionals, but fortunately supports tags.
+# And ansible 2.5 added special tags 'never' and 'always'. Additionally, as
+# ansible_connection is not a gathered fact, and its value is always set by
+# ansible entering the playbook, the tag can be set dynamically based on it.
+# Also note that prior to ansible 2.5.6, this meta task was buggy and failed
+# as well when no control socket was set.
+- meta: reset_connection
+  tags: "{{ 'always' if ansible_connection == 'ssh' else 'never' }}"
+
+
 # If the cookie doesn't exist, it means initial ruleset has been restored,
 # and it shouln't. If it exists, it means we have to remove it to avoid the
 # rollback.  Last but not least, the task that removes the cookie MUST be the
@@ -41,10 +52,8 @@
     state: absent
   register: confirm
   failed_when: confirm is not changed
-  connection: paramiko
   vars:
     # Adding a few seconds is enough for ssh plugin to not get 'unreachable'
     # state, but for whatever reason, it is harder for paramiko to wait for
     # connection.
     ansible_timeout: "{{ iptables_apply__timeout|int * 2 }}"
-
