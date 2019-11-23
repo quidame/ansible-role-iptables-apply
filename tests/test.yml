@@ -113,6 +113,7 @@
         policy: DROP
       register: iptables
       failed_when: iptables is changed
+      check_mode: yes
 
     - name: "validate templated ruleset"
       iptables:
@@ -124,6 +125,7 @@
         jump: DROP
       register: iptables
       failed_when: iptables is changed
+      check_mode: yes
 
     - name: "validate 'template' action"
       systemd:
@@ -132,6 +134,7 @@
         state: started
       register: service_status
       failed_when: service_status is changed
+      check_mode: yes
 
     - name: "SUCCESSFULLY PASSED TEST 02: ACTION 'TEMPLATE'"
       pause:
