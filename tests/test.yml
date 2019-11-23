@@ -555,9 +555,9 @@
             iptables_apply__template_core: no
             iptables_apply__template_rules: []
             iptables_apply__template_policy:
-              - input: ACCEPT
-              - forward: ACCEPT
-              - output: DROP
+              input: ACCEPT
+              forward: ACCEPT
+              output: DROP
       rescue:
         - name: expected error
           debug:
