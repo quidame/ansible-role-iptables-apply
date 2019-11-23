@@ -10,16 +10,14 @@
     (
       iptables-restore {{ '--noflush' if iptables_apply__noflush|bool and
                           check_rule is defined and check_rule is changed
-                          else '' }} {{ iptables_apply__path_buffer }}
+                          else '' }} {{ iptables_apply__path_buffer }} &&
       rm -f {{ iptables_apply__path_buffer }}
-      i=0
-      while test $i -lt {% if iptables_apply__timeout|int > 60 %}60{%
-                           elif iptables_apply__timeout|int < 5 %}5{%
-                           else %}{{ iptables_apply__timeout|int }}{%
-                           endif %}; do
-        sleep 1; i=$((i+1))
+
+      while test ${i:=0} -lt {{ iptables_apply__timeout|int }} && i=$((i+1)); do
+        sleep 1
         test -e {{ iptables_apply__path_backup }} || exit 0
       done
+
       iptables-restore {{ iptables_apply__path_backup }} &&
       rm -f {{ iptables_apply__path_backup }}
     ) &
@@ -28,15 +26,9 @@
   changed_when: true
 
 
-# reset_connection raises an unmanageable error when used with paramiko. This
-# meta task doesn't support 'when' conditionals, but fortunately supports tags.
-# And ansible 2.5 added special tags 'never' and 'always'. Additionally, as
-# ansible_connection is not a gathered fact, and its value is always set by
-# ansible entering the playbook, the tag can be set dynamically based on it.
-# Also note that prior to ansible 2.5.6, this meta task was buggy and failed
-# as well when no control socket was set.
+# This will ensure to not reuse a connected socket that could still be usable
+# only because of a passing rule for ESTABLISHED or RELATED states of packets.
 - meta: reset_connection
-  tags: "{{ 'always' if ansible_connection == 'ssh' else 'never' }}"
 
 
 # If the cookie doesn't exist, it means initial ruleset has been restored,
@@ -53,7 +45,4 @@
   register: confirm
   failed_when: confirm is not changed
   vars:
-    # Adding a few seconds is enough for ssh plugin to not get 'unreachable'
-    # state, but for whatever reason, it is harder for paramiko to wait for
-    # connection.
     ansible_timeout: "{{ iptables_apply__timeout|int * 2 }}"
