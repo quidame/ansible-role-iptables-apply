@@ -1,29 +1,27 @@
 ---
 # Perform a safety check to ensure rollback will happen if needed, and also
-# ensure the backup of initial ruleset is suitable for a rollback if needed.
-- name: check and initialization
-  import_tasks: iptables-prepare.yml
+# ensure the backup of initial ruleset is suitable for a rollback if needed
+# (i.e. not an empty file).
+- import_tasks: iptables-prepare.yml
 
 
 # Do all the stuff using a template, or just delete/append/insert/update rules.
 # Do not ever try to modify system state (iptables state) nor system files (in
 # /etc) at this step.  All actions are performed against a temporary file, the
-# 'buffer'.
-- name: build iptables ruleset in a temporary buffer
-  include_tasks: "rules-{{ iptables_apply__action }}.yml"
+# 'buffer' (that is a copy of the 'backup', all created above).
+- import_tasks: "rules-{{ iptables_apply__action }}.yml"
 
 
 # Actually apply the ruleset and try to confirm it. The conditional is for
 # idempotency.
-- name: apply and validate iptables ruleset
+- name: "apply and validate iptables ruleset if buffer has changed"
   include_tasks: iptables-apply.yml
   when:
     - iptables_ruleset is changed
 
 
 # Save applied ruleset so it will be applied again after reboot.
-- name: confirm applied ruleset as persistent
-  include_tasks: iptables-persist.yml
+- import_tasks: iptables-persist.yml
   when:
     - iptables_ruleset is changed
     - iptables_apply__persist|bool
@@ -31,5 +29,4 @@
 
 # And finally, ensure the service is started and enabled (or not). The use of
 # a loop for only one item is to display each attribute of the item.
-- name: manage firewall service state and activation
-  import_tasks: iptables-service.yml
+- import_tasks: iptables-service.yml
