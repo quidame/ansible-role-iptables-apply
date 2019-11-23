@@ -49,7 +49,7 @@
 
 # If the buffer is not modified, it remains the same than the backup, so the
 # next step will be skipped and these files will not be removed. Do it here.
-- name: remove temporary backup and buffer
+- name: "remove temporary backup and buffer"
   file:
     path: "{{ tmpfile }}"
     state: absent

@@ -5,7 +5,7 @@
 # Also, by using the temporary backup file as a cookie (absent/present), we can
 # either roll back or validate the rules and in the same time cleanup the file,
 # since attempts to remove it AFTER the failure may come too late.
-- name: 1. apply iptables ruleset and wait for confirmation
+- name: "1. apply iptables ruleset and wait for confirmation"
   shell: >
     (
       iptables-restore {{ '--noflush' if iptables_apply__noflush|bool and
@@ -38,7 +38,7 @@
 # module is unusable here, since if a host is unreachable before the rollback,
 # the next task comes too late for all other hosts: rollbacks already happened
 # on all of them, whatever safe or not the applied ruleset was.
-- name: 2. confirm applied ruleset to avoid rollback
+- name: "2. confirm applied ruleset and disable rollback"
   file:
     path: "{{ iptables_apply__path_backup }}"
     state: absent

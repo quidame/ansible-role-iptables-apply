@@ -8,7 +8,7 @@
   hosts: tests
   become: yes
   tasks:
-    - name: install package
+    - name: "install package"
       apt:
         name: iptables-persistent
         state: present
@@ -19,7 +19,7 @@
       when:
         - ansible_os_family|lower in ["debian"]
 
-    - name: install package
+    - name: "install package"
       yum:
         name: iptables
         state: present
@@ -30,7 +30,7 @@
       when:
         - ansible_os_family|lower in ["redhat"]
 
-    - name: preset rules to append, insert, delete or template
+    - name: "preset rules to append, insert, delete or template"
       set_fact:
         to_append:
           - name: "Web HTTP/HTTPS"
@@ -63,17 +63,17 @@
         iptables_apply__service_enabled: no
         iptables_apply__service_started: no
 
-    - name: reboot
+    - name: "reboot"
       shell: ( sleep 1; systemctl reboot ) &
       changed_when: true
       async: 1
       poll: 0
 
-    - name: wait for host to come back... this may take a while...
+    - name: "wait for host to come back... this may take a while..."
       wait_for_connection:
         delay: 5
 
-    - name: check iptables-save output
+    - name: "check iptables-save output"
       command: iptables-save
       register: command
       changed_when: false
@@ -83,14 +83,14 @@
         name: iptables_apply
         tasks_from: iptables-prepare.yml
 
-    - name: check backup content
+    - name: "check backup content"
       lineinfile:
         path: "{{ iptables_apply__path_backup|default('/run/iptables.saved') }}"
         line: "*filter"
       register: lineinfile
       failed_when: lineinfile is changed
 
-    - name: "SUCCESSFULLY PASSED TEST: INITIALIZATION FROM NULL STATE"
+    - name: "SUCCESSFULLY PASSED TEST 01: INITIALIZATION FROM NULL STATE"
       pause:
         seconds: 5
 
@@ -105,7 +105,7 @@
     - role: iptables_apply
 
   tasks:
-    - name: validate templated policy
+    - name: "validate templated policy"
       # Policy DROP in chain INPUT should be enough to state that a firewall is
       # in place.
       iptables:
@@ -114,7 +114,7 @@
       register: iptables
       failed_when: iptables is changed
 
-    - name: validate templated ruleset
+    - name: "validate templated ruleset"
       iptables:
         chain: INPUT
         protocol: tcp
@@ -125,7 +125,7 @@
       register: iptables
       failed_when: iptables is changed
 
-    - name: validate 'template' action
+    - name: "validate 'template' action"
       systemd:
         name: "{{ iptables_apply__service }}"
         enabled: true
@@ -133,7 +133,7 @@
       register: service_status
       failed_when: service_status is changed
 
-    - name: "SUCCESSFULLY PASSED TEST: ACTION 'TEMPLATE'"
+    - name: "SUCCESSFULLY PASSED TEST 02: ACTION 'TEMPLATE'"
       pause:
         seconds: 5
 
@@ -147,12 +147,12 @@
     - role: iptables_apply
 
   tasks:
-    - name: idempotency failure
+    - name: "idempotency failure"
       fail:
         msg: "There is some lack of idempotency in 'template'"
       when: iptables_ruleset is changed
 
-    - name: "SUCCESSFULLY PASSED TEST: IDEMPOTENCY OF ACTION 'TEMPLATE'"
+    - name: "SUCCESSFULLY PASSED TEST 03: IDEMPOTENCY OF ACTION 'TEMPLATE'"
       pause:
         seconds: 5
 
@@ -167,12 +167,12 @@
       iptables_apply__template_once: no
 
   tasks:
-    - name: force-overwrite failure
+    - name: "force-overwrite failure"
       fail:
         msg: "There is some lack of *force overwrite* in 'template'"
       when: iptables_ruleset is not changed
 
-    - name: "SUCCESSFULLY PASSED TEST: OVERWRITE OF ACTION 'TEMPLATE'"
+    - name: "SUCCESSFULLY PASSED TEST 04: OVERWRITE OF ACTION 'TEMPLATE'"
       pause:
         seconds: 5
 
@@ -183,7 +183,7 @@
   hosts: tests
   become: yes
   tasks:
-    - name: test rollback after bad 'template'
+    - name: "test rollback after bad 'template'"
       block:
         - include_role:
             name: iptables_apply
@@ -191,17 +191,17 @@
             iptables_apply__template_once: no
             iptables_apply__template_core: no
       rescue:
-        - name: expected error
+        - name: "expected error"
           debug:
             msg: "A rollback occured when trying to apply bad ruleset from template"
           register: rollback_template
 
-    - name: fail if role succeeded
+    - name: "fail if role succeeded"
       fail:
         msg: "There is some unexpected issue in rollback feature"
       when: rollback_template is undefined
 
-    - name: "SUCCESSFULLY PASSED TEST: ROLLBACK OF ACTION 'TEMPLATE'"
+    - name: "SUCCESSFULLY PASSED TEST 05: ROLLBACK OF ACTION 'TEMPLATE'"
       pause:
         seconds: 5
 
@@ -217,13 +217,13 @@
       iptables_apply__action: flush
 
   tasks:
-    - name: validate flushed ruleset
+    - name: "validate flushed ruleset"
       shell: iptables-save -t filter | grep -Ee '^(-A )|(:.* DROP)'
       register: grep
       changed_when: false
       failed_when: grep.rc == 0
 
-    - name: validate 'flush' action
+    - name: "validate 'flush' action"
       systemd:
         name: "{{ iptables_apply__service }}"
         enabled: false
@@ -231,7 +231,7 @@
       register: service_status
       failed_when: service_status is changed
 
-    - name: "SUCCESSFULLY PASSED TEST: ACTION 'FLUSH'"
+    - name: "SUCCESSFULLY PASSED TEST 06: ACTION 'FLUSH'"
       pause:
         seconds: 5
 
@@ -248,7 +248,7 @@
     - include_role:
         name: iptables_apply
 
-    - name: check whether or not the rules to append/insert/delete are there
+    - name: "check whether or not the rules to append/insert/delete are there"
       iptables:
         chain: "{{ rule.chain | default('INPUT') }}"
         protocol: "{{ rule.protocol | default('tcp') }}"
@@ -281,7 +281,7 @@
       iptables_apply__rules: "{{ to_delete }}"
 
   tasks:
-    - name: check the appended rule is there
+    - name: "check the appended rule is there"
       iptables:
         chain: "{{ rule.chain | default('INPUT') }}"
         protocol: "{{ rule.protocol | default('tcp') }}"
@@ -298,11 +298,11 @@
       loop_control:
         loop_var: rule
 
-    - name: "SUCCESSFULLY PASSED TEST: ACTION 'APPEND'"
+    - name: "SUCCESSFULLY PASSED TEST 07: ACTION 'APPEND'"
       pause:
         seconds: 5
 
-    - name: check the inserted rule is there
+    - name: "check the inserted rule is there"
       iptables:
         chain: "{{ rule.chain | default('INPUT') }}"
         protocol: "{{ rule.protocol | default('tcp') }}"
@@ -319,11 +319,11 @@
       loop_control:
         loop_var: rule
 
-    - name: "SUCCESSFULLY PASSED TEST: ACTION 'INSERT'"
+    - name: "SUCCESSFULLY PASSED TEST 08: ACTION 'INSERT'"
       pause:
         seconds: 5
 
-    - name: check the deleted rule is not there
+    - name: "check the deleted rule is not there"
       iptables:
         chain: "{{ rule.chain | default('INPUT') }}"
         protocol: "{{ rule.protocol | default('tcp') }}"
@@ -340,7 +340,7 @@
       loop_control:
         loop_var: rule
 
-    - name: "SUCCESSFULLY PASSED TEST: ACTION 'DELETE'"
+    - name: "SUCCESSFULLY PASSED TEST 09: ACTION 'DELETE'"
       pause:
         seconds: 5
 
@@ -360,7 +360,7 @@
         iptables_apply__action: append
         iptables_apply__rules: "{{ to_append }}"
 
-    - name: idempotency failure
+    - name: "idempotency failure"
       fail:
         msg: "There is some lack of idempotency in 'append'"
       when: iptables_ruleset is changed
@@ -371,12 +371,12 @@
         iptables_apply__action: append
         iptables_apply__rules: "{{ to_insert }}"
 
-    - name: idempotency failure
+    - name: "idempotency failure"
       fail:
         msg: "There is some lack of idempotency in 'append'"
       when: iptables_ruleset is changed
 
-    - name: "SUCCESSFULLY PASSED TEST: IDEMPOTENCY OF ACTION 'APPEND'"
+    - name: "SUCCESSFULLY PASSED TEST 10: IDEMPOTENCY OF ACTION 'APPEND'"
       pause:
         seconds: 5
 
@@ -386,7 +386,7 @@
         iptables_apply__action: insert
         iptables_apply__rules: "{{ to_insert }}"
 
-    - name: idempotency failure
+    - name: "idempotency failure"
       fail:
         msg: "There is some lack of idempotency in 'insert'"
       when: iptables_ruleset is changed
@@ -397,12 +397,12 @@
         iptables_apply__action: insert
         iptables_apply__rules: "{{ to_append }}"
 
-    - name: idempotency failure
+    - name: "idempotency failure"
       fail:
         msg: "There is some lack of idempotency in 'insert'"
       when: iptables_ruleset is changed
 
-    - name: "SUCCESSFULLY PASSED TEST: IDEMPOTENCY OF ACTION 'INSERT'"
+    - name: "SUCCESSFULLY PASSED TEST 11: IDEMPOTENCY OF ACTION 'INSERT'"
       pause:
         seconds: 5
 
@@ -412,12 +412,12 @@
         iptables_apply__action: delete
         iptables_apply__rules: "{{ to_delete }}"
 
-    - name: idempotency failure
+    - name: "idempotency failure"
       fail:
         msg: "There is some lack of idempotency in 'delete'"
       when: iptables_ruleset is changed
 
-    - name: "SUCCESSFULLY PASSED TEST: IDEMPOTENCY OF ACTION 'DELETE'"
+    - name: "SUCCESSFULLY PASSED TEST 12: IDEMPOTENCY OF ACTION 'DELETE'"
       pause:
         seconds: 5
 
@@ -430,7 +430,7 @@
   hosts: tests
   become: yes
   tasks:
-    - name: test rollback after bad 'delete'
+    - name: "test rollback after bad 'delete'"
       block:
         - include_role:
             name: iptables_apply
@@ -438,21 +438,21 @@
             iptables_apply__action: delete
             iptables_apply__rules: "{{ to_insert }}"
       rescue:
-        - name: expected error
+        - name: "expected error"
           debug:
             msg: "A rollback occured when trying to delete a needed rule"
           register: rollback_delete
 
-    - name: fail if role succeeded
+    - name: "fail if role succeeded"
       fail:
         msg: "There is some unexpected issue in rollback feature"
       when: rollback_delete is undefined
 
-    - name: "SUCCESSFULLY PASSED TEST: ROLLBACK OF ACTION 'DELETE'"
+    - name: "SUCCESSFULLY PASSED TEST 13: ROLLBACK OF ACTION 'DELETE'"
       pause:
         seconds: 5
 
-    - name: test rollback after bad 'insert'
+    - name: "test rollback after bad 'insert'"
       block:
         - include_role:
             name: iptables_apply
@@ -461,17 +461,17 @@
             iptables_apply__rules: |
               [ {{ to_delete[0] | combine({"jump":"DROP"}) }} ]
       rescue:
-        - name: expected error
+        - name: "expected error"
           debug:
             msg: "A rollback occured when trying to insert a blocking rule"
           register: rollback_insert
 
-    - name: fail if role succeeded
+    - name: "fail if role succeeded"
       fail:
         msg: "There is some unexpected issue in rollback feature"
       when: rollback_insert is undefined
 
-    - name: "SUCCESSFULLY PASSED TEST: ROLLBACK OF ACTION 'INSERT'"
+    - name: "SUCCESSFULLY PASSED TEST 14: ROLLBACK OF ACTION 'INSERT'"
       pause:
         seconds: 5
 
@@ -480,7 +480,7 @@
       vars:
         iptables_apply__action: flush
 
-    - name: test rollback after bad 'append'
+    - name: "test rollback after bad 'append'"
       block:
         - include_role:
             name: iptables_apply
@@ -489,17 +489,17 @@
             iptables_apply__rules: |
               [ {{ to_delete[0] | combine({"jump":"DROP"}) }} ]
       rescue:
-        - name: expected error
+        - name: "expected error"
           debug:
             msg: "A rollback occured when trying to append a blocking rule"
           register: rollback_append
 
-    - name: fail if role succeeded
+    - name: "fail if role succeeded"
       fail:
         msg: "There is some unexpected issue in rollback feature"
       when: rollback_append is undefined
 
-    - name: "SUCCESSFULLY PASSED TEST: ROLLBACK OF ACTION 'APPEND'"
+    - name: "SUCCESSFULLY PASSED TEST 15: ROLLBACK OF ACTION 'APPEND'"
       pause:
         seconds: 5
 
@@ -520,7 +520,7 @@
       iptables_apply__noflush: yes
 
   tasks:
-    - name: check the appended rule is still there
+    - name: "check the appended rule is still there"
       iptables:
         chain: "{{ rule.chain | default('INPUT') }}"
         protocol: "{{ rule.protocol | default('tcp') }}"
@@ -536,7 +536,7 @@
       loop_control:
         loop_var: rule
 
-    - name: "SUCCESSFULLY PASSED TEST: NO FLUSH OF ACTION 'TEMPLATE'"
+    - name: "SUCCESSFULLY PASSED TEST 16: NO FLUSH OF ACTION 'TEMPLATE'"
       pause:
         seconds: 5
 
@@ -546,7 +546,7 @@
   hosts: tests
   become: yes
   tasks:
-    - name: test rollback after bad policy
+    - name: "test rollback after bad policy"
       block:
         - include_role:
             name: iptables_apply
@@ -559,17 +559,17 @@
               forward: ACCEPT
               output: DROP
       rescue:
-        - name: expected error
+        - name: "expected error"
           debug:
             msg: "A rollback occured when trying to apply bad ruleset from template"
           register: rollback_policy
 
-    - name: fail if role succeeded
+    - name: "fail if role succeeded"
       fail:
         msg: "There is some unexpected issue in rollback feature"
       when: rollback_policy is undefined
 
-    - name: "SUCCESSFULLY PASSED TEST: ROLLBACK WITH A BAD POLICY"
+    - name: "SUCCESSFULLY PASSED TEST 17: ROLLBACK WITH A BAD POLICY"
       pause:
         seconds: 5
 
@@ -579,7 +579,7 @@
   hosts: tests
   become: yes
   tasks:
-    - name: test rollback timeout (lower limit)
+    - name: "test rollback timeout (lower limit)"
       block:
         - include_role:
             name: iptables_apply
@@ -588,21 +588,21 @@
             iptables_apply__template_core: no
             iptables_apply__timeout: 5
       rescue:
-        - name: expected error
+        - name: "expected error"
           debug:
             msg: "A rollback occured when trying to apply bad ruleset from template"
           register: rollback_timeout_upper
 
-    - name: fail if role succeeded
+    - name: "fail if role succeeded"
       fail:
         msg: "There is some unexpected issue in rollback feature"
       when: rollback_timeout_upper is undefined
 
-    - name: "SUCCESSFULLY PASSED TEST: ROLLBACK WITH LOWER TIMEOUT"
+    - name: "SUCCESSFULLY PASSED TEST 18: ROLLBACK WITH LOWER TIMEOUT"
       pause:
         seconds: 5
 
-    - name: test rollback timeout (upper limit)
+    - name: "test rollback timeout (upper limit)"
       block:
         - include_role:
             name: iptables_apply
@@ -611,17 +611,17 @@
             iptables_apply__template_core: no
             iptables_apply__timeout: 60
       rescue:
-        - name: expected error
+        - name: "expected error"
           debug:
             msg: "A rollback occured when trying to apply bad ruleset from template"
           register: rollback_timeout_lower
 
-    - name: fail if role succeeded
+    - name: "fail if role succeeded"
       fail:
         msg: "There is some unexpected issue in rollback feature"
       when: rollback_timeout_lower is undefined
 
-    - name: "SUCCESSFULLY PASSED TEST: ROLLBACK WITH UPPER TIMEOUT"
+    - name: "SUCCESSFULLY PASSED TEST 19: ROLLBACK WITH UPPER TIMEOUT"
       pause:
         seconds: 5
 
@@ -645,7 +645,7 @@
         dport: "{{ to_update[0].dport }}"
 
   pre_tasks:
-    - name: check whether or not the rules to append/update/delete are there
+    - name: "check whether or not the rules to append/update/delete are there"
       iptables:
         chain: "{{ rule.chain | default('INPUT') }}"
         protocol: "{{ rule.protocol | default('tcp') }}"
@@ -671,7 +671,7 @@
       iptables_apply__rules: "{{ pivot_rule + to_update }}"
 
   tasks:
-    - name: check whether or not the rules to append/update/delete are there
+    - name: "check whether or not the rules to append/update/delete are there"
       iptables:
         chain: "{{ rule.chain | default('INPUT') }}"
         protocol: "{{ rule.protocol | default('tcp') }}"
@@ -691,7 +691,7 @@
       loop_control:
         loop_var: rule
 
-    - name: "SUCCESSFULLY PASSED TEST: UPDATE OF ACTION 'APPEND'"
+    - name: "SUCCESSFULLY PASSED TEST 20: UPDATE OF ACTION 'APPEND'"
       pause:
         seconds: 5
 

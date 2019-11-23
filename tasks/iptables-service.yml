@@ -1,5 +1,5 @@
 ---
-- name: manage firewall service state and activation
+- name: "manage firewall service state and activation"
   systemd:
     name: "{{ iptables_apply__service }}"
     enabled: "{{ service.enabled }}"

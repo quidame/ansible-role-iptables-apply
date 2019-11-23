@@ -1,5 +1,5 @@
 ---
-- name: delete all rules and reset policies to 'ACCEPT' for all chains
+- name: "delete all rules and reset policies to 'ACCEPT' for all chains"
   template:
     src: "{{ iptables_apply__flush }}"
     dest: "{{ iptables_apply__path_buffer }}"

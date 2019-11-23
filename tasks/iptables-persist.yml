@@ -1,5 +1,5 @@
 ---
-- name: confirm applied ruleset as persistent
+- name: "confirm applied ruleset as persistent"
   command: "service {{ iptables_apply__service }} save"
   changed_when: true
   args:

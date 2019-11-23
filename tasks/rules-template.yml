@@ -2,7 +2,7 @@
 # We can state that a firewall is set with only one criterion:
 # INPUT chain has a DROP default policy.  If we are polite, we will left it
 # unmodified. By default we don't.
-- name: check if a consistent ruleset is already in use
+- name: "check if a consistent ruleset is already in use"
   check_mode: true
   iptables:
     chain: INPUT
@@ -10,7 +10,7 @@
   register: policy
 
 
-- name: check if templated rules are in use
+- name: "check if templated rules are in use"
   check_mode: true
   iptables:
     chain: INPUT
@@ -26,7 +26,7 @@
 # First ensure the resulting file is in good shape when making it available on
 # the remote host. Do not perform action directly upon the system file nor the
 # system state.
-- name: rewrite iptables ruleset from scratch
+- name: "rewrite iptables ruleset from scratch"
   template:
     src: "{{ iptables_apply__template }}"
     dest: "{{ iptables_apply__path_buffer }}"
@@ -39,7 +39,7 @@
 
 # If the buffer is not modified, it remains the same than the backup, so the
 # next step will be skipped and these files will not be removed. Do it here.
-- name: remove temporary backup and buffer
+- name: "remove temporary backup and buffer"
   file:
     path: "{{ tmpfile }}"
     state: absent
