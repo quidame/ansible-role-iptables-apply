@@ -2,7 +2,7 @@
 # We can state that a firewall is set with only one criterion:
 # INPUT chain has a DROP default policy.  If we are polite, we will left it
 # unmodified. By default we don't.
-- name: check if a consistent ruleset is in already in use
+- name: check if a consistent ruleset is already in use
   check_mode: true
   iptables:
     chain: INPUT
@@ -37,10 +37,15 @@
       ( policy is not changed and check_rule is changed )
 
 
-# Tasks in iptables-apply.yml need this file and will remove it. But when
-# iptables_ruleset is not changed, they will be skipped.
-- name: remove temporary backup
+# If the buffer is not modified, it remains the same than the backup, so the
+# next step will be skipped and these files will not be removed. Do it here.
+- name: remove temporary backup and buffer
   file:
-    path: "{{ iptables_apply__path_backup }}"
+    path: "{{ tmpfile }}"
     state: absent
+  loop:
+    - "{{ iptables_apply__path_backup }}"
+    - "{{ iptables_apply__path_buffer }}"
+  loop_control:
+    loop_var: tmpfile
   when: iptables_ruleset is not changed
