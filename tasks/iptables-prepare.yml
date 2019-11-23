@@ -1,27 +1,35 @@
 ---
 # Initialize iptables so the output of iptables-save will not be empty.
 # Otherwise, rolling back to previous state will not work when restoring this
-# state from nothing. This shell task is idempotent. It plays with the exit
-# status like this:
-# - 'filter' is found in iptables-save output: exit 0, succeeded and not
-#   changed.
-# - 'filter' is not found, then an unexisting rule is checked: exit 1, that
-#   means here: succeeded and changed.
-- name: initialize state of the firewall
-  shell: iptables-save | grep filter || iptables -C OUTPUT -j ACCEPT
+# state from nothing.
+
+
+- name: "check initial state of the firewall"
+  shell: iptables-save
   register: init_state
-  changed_when: init_state.rc > 0
-  failed_when: init_state.rc > 1
+  changed_when: false
 
 
-# The first file will be used in case of rollback, and the second one, if any,
-# as the starting point for `append`, `insert` or `delete` actions.
-- name: save initial state of the firewall
+- name: "initialize firewall from NULL state"
+  command: iptables-restore
+  args:
+    stdin: |
+      *filter
+      :INPUT ACCEPT
+      :OUTPUT ACCEPT
+      :FORWARD ACCEPT
+      COMMIT
+  when: init_state.stdout_lines == []
+  changed_when: true
+
+
+# The first file will be used in case of rollback, and the second one, as the
+# starting point for atomic changes with actions `append`, `insert` or `delete`.
+# Actions `template` and `flush` will overwrite it entirely.
+- name: "save initial state of the firewall"
   shell: >
-    iptables-save {{ '-t filter' if iptables_apply__action not in ['template','flush'] else '' }} |
-    tee {{ iptables_apply__path_backup }} {{
-           iptables_apply__path_buffer if iptables_apply__action not in ['template','flush'] else ''
-        }}
+    iptables-save {{ '' if iptables_apply__action in ['template','flush'] else '-t filter' }} |
+    tee {{ iptables_apply__path_backup }} {{ iptables_apply__path_buffer }}
   register: saved_state
   changed_when: true
   failed_when: saved_state.stdout_lines == []
