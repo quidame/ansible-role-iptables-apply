@@ -22,7 +22,7 @@ iptables_apply__action: template
 # iptables_apply__rules
 #
 # The iptables rules to apply when `iptables_apply__action` is one of `append`,
-# `delete` or `insert`. This is a list of dictionnaries accepting the following
+# `delete` or `insert`. This is a list of dictionaries accepting the following
 # keys:
 # * name
 #   Mandatory. String. Used as the rule's comment
@@ -80,7 +80,7 @@ iptables_apply__template: iptables_apply.j2
 # iptables_apply__template_rules
 #
 # The iptables rules to apply in addition to the sanity ruleset provided by
-# the template. This is a list of dictionnaries accepting the same keys than
+# the template. This is a list of dictionaries accepting the same keys than
 # `iptables_apply__rules` and defaults to the same value.
 #
 iptables_apply__template_rules: "{{ iptables_apply__rules }}"
