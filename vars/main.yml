@@ -85,9 +85,8 @@ iptables_apply__template_policy:
 # the template. The second variable (once) is a boolean allowing one to force
 # the replay, when set to 'false' (defaults to 'true').
 #
-iptables_apply__template_mark: "bad NEWs"
+iptables_apply__template_mark: '-A INPUT -p tcp -m tcp ! --tcp-flags FIN,SYN,RST,ACK SYN -m comment --comment "bad NEWs" -j DROP'
 iptables_apply__template_once: true
-
 
 ################################################################################
 # iptables_apply__flush
