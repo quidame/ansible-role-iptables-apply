@@ -582,14 +582,14 @@
   hosts: tests
   become: yes
   tasks:
-    - name: "test rollback timeout (lower limit)"
+    - name: "test rollback timeout (lower limit = {{ lower_timeout | default(5) }})"
       block:
         - include_role:
             name: iptables_apply
           vars:
             iptables_apply__template_once: no
             iptables_apply__template_core: no
-            iptables_apply__timeout: 5
+            iptables_apply__timeout: "{{ lower_timeout | default(5) }}"
       rescue:
         - name: "expected error"
           debug:
@@ -601,18 +601,18 @@
         msg: "There is some unexpected issue in rollback feature"
       when: rollback_timeout_upper is undefined
 
-    - name: "SUCCESSFULLY PASSED TEST 18: ROLLBACK WITH LOWER TIMEOUT"
+    - name: "SUCCESSFULLY PASSED TEST 18: ROLLBACK WITH LOWER TIMEOUT ({{ lower_timeout | default(5) }} seconds)"
       pause:
         seconds: 5
 
-    - name: "test rollback timeout (upper limit)"
+    - name: "test rollback timeout (upper limit = {{ upper_timeout | default(60) }})"
       block:
         - include_role:
             name: iptables_apply
           vars:
             iptables_apply__template_once: no
             iptables_apply__template_core: no
-            iptables_apply__timeout: 60
+            iptables_apply__timeout: "{{ upper_timeout | default(60) }}"
       rescue:
         - name: "expected error"
           debug:
@@ -624,7 +624,7 @@
         msg: "There is some unexpected issue in rollback feature"
       when: rollback_timeout_lower is undefined
 
-    - name: "SUCCESSFULLY PASSED TEST 19: ROLLBACK WITH UPPER TIMEOUT"
+    - name: "SUCCESSFULLY PASSED TEST 19: ROLLBACK WITH UPPER TIMEOUT ({{ upper_timeout | default(60) }} seconds)"
       pause:
         seconds: 5
 
