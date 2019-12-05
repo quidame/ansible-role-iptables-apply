@@ -48,14 +48,10 @@
 
 
 # If the buffer is not modified, it remains the same than the backup, so the
-# next step will be skipped and these files will not be removed. Do it here.
-- name: "remove temporary backup and buffer"
+# next step will be skipped and this file will not be removed. Do it here.
+- name: "remove temporary buffer"
   file:
-    path: "{{ tmpfile }}"
+    path: "{{ iptables_apply__path_buffer }}"
     state: absent
-  loop:
-    - "{{ iptables_apply__path_backup }}"
-    - "{{ iptables_apply__path_buffer }}"
-  loop_control:
-    loop_var: tmpfile
-  when: iptables_ruleset is not changed
+  when:
+    - iptables_ruleset is not changed

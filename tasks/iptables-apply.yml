@@ -9,8 +9,8 @@
   shell: >
     (
       iptables-restore {{ '--noflush' if iptables_apply__noflush|bool and
-                          check_rule is defined and check_rule is changed
-                          else '' }} {{ iptables_apply__path_buffer }} &&
+        iptables_apply__template_mark not in saved_state.stdout_lines
+        else '' }} {{ iptables_apply__path_buffer }} &&
       rm -f {{ iptables_apply__path_buffer }}
 
       while test ${i:=0} -lt {{ iptables_apply__timeout|int }} && i=$((i+1)); do
@@ -21,6 +21,8 @@
       iptables-restore {{ iptables_apply__path_backup }} &&
       rm -f {{ iptables_apply__path_backup }}
     ) &
+  args:
+    removes: "{{ iptables_apply__path_buffer }}"
   async: 1
   poll: 0
   changed_when: true

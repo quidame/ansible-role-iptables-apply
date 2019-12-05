@@ -4,3 +4,6 @@
   changed_when: true
   args:
     warn: no
+  when:
+    - iptables_ruleset is changed
+    - iptables_apply__persist|bool

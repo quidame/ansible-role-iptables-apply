@@ -12,21 +12,13 @@
 - import_tasks: "rules-{{ iptables_apply__action }}.yml"
 
 
-# Actually apply the ruleset and try to confirm it. The conditional is for
-# idempotency.
-- name: "apply and validate iptables ruleset if buffer has changed"
-  include_tasks: iptables-apply.yml
-  when:
-    - iptables_ruleset is changed
+# Actually apply the ruleset and try to confirm it.
+- import_tasks: iptables-apply.yml
 
 
 # Save applied ruleset so it will be applied again after reboot.
 - import_tasks: iptables-persist.yml
-  when:
-    - iptables_ruleset is changed
-    - iptables_apply__persist|bool
 
 
-# And finally, ensure the service is started and enabled (or not). The use of
-# a loop for only one item is to display each attribute of the item.
+# And finally, ensure the service is started and enabled (or not).
 - import_tasks: iptables-service.yml

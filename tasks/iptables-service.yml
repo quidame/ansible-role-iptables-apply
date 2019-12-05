@@ -1,4 +1,6 @@
 ---
+# The use of a loop for only one item is to display each attribute of the item,
+# i.e. relevant info, in the task result instead of in its name.
 - name: "manage firewall service state and activation"
   systemd:
     name: "{{ iptables_apply__service }}"

@@ -5,7 +5,7 @@
 
 
 - name: "check initial state of the firewall"
-  shell: iptables-save
+  command: iptables-save
   register: init_state
   changed_when: false
 
