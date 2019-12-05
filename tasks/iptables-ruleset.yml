@@ -2,7 +2,7 @@
 # The regexp being the same, a same task may be used to `append`, `insert` or
 # `delete` rules.
 
-- name: "{{ iptables_apply__action }}{{ '' if iptables_apply__action == 'delete' else '/update' }} rules in current ruleset"
+- name: "{{ iptables_apply__action }}{{ '' if iptables_apply__action == 'delete' else '/update' }} rules in ruleset's buffer"
   lineinfile:
     # Do not perform action directly upon the system file nor the system state.
     path: "{{ iptables_apply__path_buffer }}"
