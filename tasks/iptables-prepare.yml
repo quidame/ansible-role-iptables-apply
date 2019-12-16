@@ -4,32 +4,21 @@
 # state from nothing.
 
 
-- name: "check initial state of the firewall"
-  command: iptables-save
-  register: init_state
-  changed_when: false
+- name: "ensure backup will not be empty"
+  block:
+    - import_tasks: iptables-init.yml
 
+  rescue:
 
-- name: "initialize firewall from NULL state"
-  command: iptables-restore
-  args:
-    stdin: |
-      *filter
-      :INPUT ACCEPT
-      :OUTPUT ACCEPT
-      :FORWARD ACCEPT
-      COMMIT
-  when: init_state.stdout_lines == []
-  changed_when: true
+    - name: "initialize firewall from NULL state"
+      command: iptables-restore
+      args:
+        stdin: |
+          *filter
+          :INPUT ACCEPT [0:0]
+          :OUTPUT ACCEPT [0:0]
+          :FORWARD ACCEPT [0:0]
+          COMMIT
+      changed_when: true
 
-
-# The first file will be used in case of rollback, and the second one, as the
-# starting point for atomic changes with actions `append`, `insert` or `delete`.
-# Actions `template` and `flush` will overwrite it entirely.
-- name: "save initial state of the firewall"
-  shell: >
-    iptables-save {{ '' if iptables_apply__action in ['template','flush'] else '-t filter' }} |
-    tee {{ iptables_apply__path_backup }} {{ iptables_apply__path_buffer }}
-  register: saved_state
-  changed_when: true
-  failed_when: saved_state.stdout_lines == []
+    - import_tasks: iptables-init.yml
