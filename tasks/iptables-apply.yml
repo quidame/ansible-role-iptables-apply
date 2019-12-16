@@ -10,7 +10,7 @@
     (
       iptables-restore {{ '--noflush' if iptables_apply__noflush|bool and
         iptables_apply__template_mark not in saved_state.stdout_lines
-        else '' }} {{ iptables_apply__path_buffer }} &&
+        else '' }} {{ iptables_apply__path_buffer }} ||
       rm -f {{ iptables_apply__path_buffer }}
 
       while test ${i:=0} -lt {{ iptables_apply__timeout|int }} && i=$((i+1)); do
@@ -21,8 +21,6 @@
       iptables-restore {{ iptables_apply__path_backup }} &&
       rm -f {{ iptables_apply__path_backup }}
     ) &
-  args:
-    removes: "{{ iptables_apply__path_buffer }}"
   async: 1
   poll: 0
   changed_when: true
@@ -42,9 +40,23 @@
 # on all of them, whatever safe or not the applied ruleset was.
 - name: "2. confirm applied ruleset and disable rollback"
   file:
-    path: "{{ iptables_apply__path_backup }}"
+    path: "{{ tempfile }}"
     state: absent
+  loop:
+    - "{{ iptables_apply__path_backup }}"
+    - "{{ iptables_apply__path_buffer }}"
+  loop_control:
+    loop_var: tempfile
   register: confirm
   failed_when: confirm is not changed
   vars:
     ansible_timeout: "{{ iptables_apply__timeout|int * 2 }}"
+
+
+- name: "3. confirm applied ruleset as persistent"
+  command: "service {{ iptables_apply__service }} save"
+  changed_when: true
+  args:
+    warn: no
+  when:
+    - iptables_apply__persist|bool

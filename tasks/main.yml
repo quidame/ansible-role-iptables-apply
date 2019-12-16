@@ -13,11 +13,9 @@
 
 
 # Actually apply the ruleset and try to confirm it.
-- import_tasks: iptables-apply.yml
-
-
-# Save applied ruleset so it will be applied again after reboot.
-- import_tasks: iptables-persist.yml
+- name: "apply buffer's ruleset if changed"
+  include_tasks: iptables-apply.yml
+  when: iptables_ruleset is changed
 
 
 # And finally, ensure the service is started and enabled (or not).
