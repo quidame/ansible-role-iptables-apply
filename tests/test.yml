@@ -4,9 +4,11 @@
 # `REJECT` target.  Triggered rollbacks are handled in blocks.
 ---
 ################################################################################
-- name: "00. PREPARE THE FIELD"
+- name: "PREPARE THE FIELD"
   hosts: tests
   become: yes
+  tags: always
+
   tasks:
     - name: "install package"
       apt:
@@ -32,29 +34,32 @@
 
     - name: "preset rules to append, insert, delete or template"
       set_fact:
-        to_append:
+        rules_web:
           - name: "Web HTTP/HTTPS"
             dport: "80,443"
+        rules_ssh:
+          - name: "SSH"
+            dport: "{{ ansible_port|default(22) }}"
         to_insert:
           - name: "4 TESTS"
             dport: "20:23"
-        to_delete:
-          - name: "SSH"
-            dport: "{{ ansible_port|default(22) }}"
         iptables_apply__template_rules:
           - name: "monitoring"
             dport: "161,5666"
           - name: "monitoring"
             dport: "161"
             protocol: "udp"
+        number: 1
 
 
 ################################################################################
-# Ensure that if a rollback is triggered, the ruleset to restore is not empty.
-# This tests that the backed up ruleset is not empty.
-- name: "01. TEST INITIALIZATION FROM NULL STATE"
+- name: "TEST INITIALIZATION FROM NULL STATE WITH ACTION 'TEMPLATE'"
   hosts: tests
+  gather_facts: no
   become: yes
+  tags:
+    - init
+
   tasks:
     - include_role:
         name: iptables_apply
@@ -64,16 +69,9 @@
         iptables_apply__service_started: no
 
     - name: "reboot"
-      shell: ( sleep 1; systemctl reboot ) &
-      changed_when: true
-      async: 1
-      poll: 0
+      reboot:
 
-    - name: "wait for host to come back... this may take a while..."
-      wait_for_connection:
-        delay: 5
-
-    - name: "check iptables-save output"
+    - name: "check iptables-save output is empty"
       command: iptables-save
       register: command
       changed_when: false
@@ -82,25 +80,97 @@
     - include_role:
         name: iptables_apply
         tasks_from: iptables-prepare.yml
+      vars:
+        iptables_apply__action: template
 
-    - name: "check backup content"
+    - name: "check backup content (table)"
       lineinfile:
         path: "{{ iptables_apply__path_backup|default('/run/iptables.saved') }}"
         line: "*filter"
       register: lineinfile
       failed_when: lineinfile is changed
 
-    - name: "SUCCESSFULLY PASSED TEST 01: INITIALIZATION FROM NULL STATE"
-      pause:
-        seconds: 5
+    - name: "check backup content (policies)"
+      replace:
+        path: "{{ iptables_apply__path_backup|default('/run/iptables.saved') }}"
+        regexp: '^(:(IN|OUT)PUT ACCEPT) \[[0-9]+:[0-9]+\]$'
+        replace: '\1 [0:0]'
+      register: replace
+      failed_when: replace is not changed
+
+    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }}: INITIALIZATION FROM NULL STATE WITH ACTION 'TEMPLATE'"
+      set_fact:
+        number: "{{ number|int + 1 }}"
 
 
 ################################################################################
-# Ensure that the default action does something consistent: the default INPUT
-# policy **MUST** be `DROP`, and the service **MUST** be started and enabled.
-- name: "02. TEST ACTION 'TEMPLATE'"
+- name: "TEST INITIALIZATION FROM NULL STATE WITH ACTION 'APPEND'"
   hosts: tests
+  gather_facts: no
   become: yes
+  tags:
+    - init
+
+  tasks:
+    - include_role:
+        name: iptables_apply
+        tasks_from: iptables-service.yml
+      vars:
+        iptables_apply__service_enabled: no
+        iptables_apply__service_started: no
+
+    - name: "reboot"
+      reboot:
+
+    - name: "check iptables-save output is empty"
+      command: iptables-save
+      register: command
+      changed_when: false
+      failed_when: command.stdout_lines != []
+
+    - include_role:
+        name: iptables_apply
+        tasks_from: iptables-prepare.yml
+      vars:
+        iptables_apply__action: append
+
+    - name: "check backup content (table)"
+      lineinfile:
+        path: "{{ iptables_apply__path_backup|default('/run/iptables.saved') }}"
+        line: "*filter"
+      register: lineinfile
+      failed_when: lineinfile is changed
+
+    - name: "check backup content (INPUT policy)"
+      lineinfile:
+        path: "{{ iptables_apply__path_backup|default('/run/iptables.saved') }}"
+        regexp: '^:INPUT ACCEPT .*'
+        state: absent
+      register: lineinfile
+      failed_when: lineinfile is not changed
+
+    - name: "check backup content (OUTPUT policy)"
+      lineinfile:
+        path: "{{ iptables_apply__path_backup|default('/run/iptables.saved') }}"
+        regexp: '^:OUTPUT ACCEPT .*'
+        state: absent
+      register: lineinfile
+      failed_when: lineinfile is not changed
+
+    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }}: INITIALIZATION FROM NULL STATE WITH ACTION 'APPEND'"
+      set_fact:
+        number: "{{ number|int + 1 }}"
+
+
+################################################################################
+- name: "TEST ACTION 'TEMPLATE'"
+  hosts: tests
+  gather_facts: no
+  become: yes
+  tags:
+    - template
+    - action
+
   roles:
     - role: iptables_apply
 
@@ -136,16 +206,20 @@
       failed_when: service_status is changed
       check_mode: yes
 
-    - name: "SUCCESSFULLY PASSED TEST 02: ACTION 'TEMPLATE'"
-      pause:
-        seconds: 5
+    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }}: ACTION 'TEMPLATE'"
+      set_fact:
+        number: "{{ number|int + 1 }}"
 
 
 ################################################################################
-# Ensure the default action is idempotent.
-- name: "03. TEST INDEMPOTENCY OF ACTION 'TEMPLATE'"
+- name: "TEST INDEMPOTENCY OF ACTION 'TEMPLATE'"
   hosts: tests
+  gather_facts: no
   become: yes
+  tags:
+    - template
+    - idempotency
+
   roles:
     - role: iptables_apply
 
@@ -155,16 +229,21 @@
         msg: "There is some lack of idempotency in 'template'"
       when: iptables_ruleset is changed
 
-    - name: "SUCCESSFULLY PASSED TEST 03: IDEMPOTENCY OF ACTION 'TEMPLATE'"
-      pause:
-        seconds: 5
+    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }}: IDEMPOTENCY OF ACTION 'TEMPLATE'"
+      set_fact:
+        number: "{{ number|int + 1 }}"
 
 
 ################################################################################
 # Ensure the parameter that forces to reapply the template is working.
-- name: "04. TEST OVERWRITE OF ACTION 'TEMPLATE'"
+- name: "TEST OVERWRITE OF ACTION 'TEMPLATE'"
   hosts: tests
+  gather_facts: no
   become: yes
+  tags:
+    - template
+    - overwrite
+
   roles:
     - role: iptables_apply
       iptables_apply__template_once: no
@@ -175,16 +254,21 @@
         msg: "There is some lack of *force overwrite* in 'template'"
       when: iptables_ruleset is not changed
 
-    - name: "SUCCESSFULLY PASSED TEST 04: OVERWRITE OF ACTION 'TEMPLATE'"
-      pause:
-        seconds: 5
+    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }}: OVERWRITE OF ACTION 'TEMPLATE'"
+      set_fact:
+        number: "{{ number|int + 1 }}"
 
 
 ################################################################################
 # Ensure the most expected feature is working fine.
-- name: "05. TEST ROLLBACK OF ACTION 'TEMPLATE'"
+- name: "TEST ROLLBACK FOR ACTION 'TEMPLATE'"
   hosts: tests
+  gather_facts: no
   become: yes
+  tags:
+    - template
+    - rollback
+
   tasks:
     - name: "test rollback after bad 'template'"
       block:
@@ -204,24 +288,27 @@
         msg: "There is some unexpected issue in rollback feature"
       when: rollback_template is undefined
 
-    - name: "SUCCESSFULLY PASSED TEST 05: ROLLBACK OF ACTION 'TEMPLATE'"
-      pause:
-        seconds: 5
+    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }}: ROLLBACK FOR ACTION 'TEMPLATE'"
+      set_fact:
+        number: "{{ number|int + 1 }}"
 
 
 ################################################################################
-# Ensure the 'flush' action does what is expected: flush rules, reset policies
-# and stop and disable the service.
-- name: "06. TEST ACTION 'FLUSH'"
+- name: "TEST ACTION 'FLUSH'"
   hosts: tests
+  gather_facts: no
   become: yes
+  tags:
+    - flush
+    - action
+
   roles:
     - role: iptables_apply
       iptables_apply__action: flush
 
   tasks:
     - name: "validate flushed ruleset"
-      shell: iptables-save -t filter | grep -Ee '^(-A )|(:.* DROP)'
+      shell: iptables-save -t filter | grep -Ee '^(-A|:.* DROP)'
       register: grep
       changed_when: false
       failed_when: grep.rc == 0
@@ -234,24 +321,22 @@
       register: service_status
       failed_when: service_status is changed
 
-    - name: "SUCCESSFULLY PASSED TEST 06: ACTION 'FLUSH'"
-      pause:
-        seconds: 5
+    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }}: ACTION 'FLUSH'"
+      set_fact:
+        number: "{{ number|int + 1 }}"
 
 
 ################################################################################
-# Ensure single rule management actions are working as expected.  We dont check
-# service status here, but only the fact that a rule has been added or removed.
-# This sequence is a junglery that removes ssh-specific passing rule with no
-# error because another one does the job.
-- name: "07,08,09. TEST ACTIONS 'APPEND', 'INSERT' AND 'DELETE'"
+- name: "TEST ACTION 'APPEND'"
   hosts: tests
+  gather_facts: no
   become: yes
-  pre_tasks:
-    - include_role:
-        name: iptables_apply
+  tags:
+    - append
+    - action
 
-    - name: "check whether or not the rules to append/insert/delete are there"
+  pre_tasks:
+    - name: "check the rule to append is not there"
       iptables:
         chain: "{{ rule.chain | default('INPUT') }}"
         protocol: "{{ rule.protocol | default('tcp') }}"
@@ -259,29 +344,18 @@
         destination_port: "{{ rule.dport }}"
         comment: "{{ rule.name }}"
         jump: "{{ rule.jump | default('ACCEPT') }}"
-        state: "{{ rule.state }}"
+        state: absent
       register: iptables
       failed_when: iptables is changed
       check_mode: yes
-      loop:
-        - "{{ to_append[0] | combine({'state':'absent'}) }}"
-        - "{{ to_insert[0] | combine({'state':'absent'}) }}"
-        - "{{ to_delete[0] | combine({'state':'present'}) }}"
+      loop: "{{ rules_web }}"
       loop_control:
         loop_var: rule
 
   roles:
     - role: iptables_apply
       iptables_apply__action: append
-      iptables_apply__rules: "{{ to_append }}"
-
-    - role: iptables_apply
-      iptables_apply__action: insert
-      iptables_apply__rules: "{{ to_insert }}"
-
-    - role: iptables_apply
-      iptables_apply__action: delete
-      iptables_apply__rules: "{{ to_delete }}"
+      iptables_apply__rules: "{{ rules_web }}"
 
   tasks:
     - name: "check the appended rule is there"
@@ -292,205 +366,87 @@
         destination_port: "{{ rule.dport }}"
         comment: "{{ rule.name }}"
         jump: "{{ rule.jump | default('ACCEPT') }}"
-        state: "{{ rule.state }}"
+        state: present
       register: iptables
       failed_when: iptables is changed
       check_mode: yes
-      loop:
-        - "{{ to_append[0] | combine({'state':'present'}) }}"
+      loop: "{{ rules_web }}"
       loop_control:
         loop_var: rule
 
-    - name: "SUCCESSFULLY PASSED TEST 07: ACTION 'APPEND'"
-      pause:
-        seconds: 5
-
-    - name: "check the inserted rule is there"
-      iptables:
-        chain: "{{ rule.chain | default('INPUT') }}"
-        protocol: "{{ rule.protocol | default('tcp') }}"
-        match: "{{ 'multiport' if ',' in rule.dport|string else omit }}"
-        destination_port: "{{ rule.dport }}"
-        comment: "{{ rule.name }}"
-        jump: "{{ rule.jump | default('ACCEPT') }}"
-        state: "{{ rule.state }}"
-      register: iptables
-      failed_when: iptables is changed
-      check_mode: yes
-      loop:
-        - "{{ to_insert[0] | combine({'state':'present'}) }}"
-      loop_control:
-        loop_var: rule
-
-    - name: "SUCCESSFULLY PASSED TEST 08: ACTION 'INSERT'"
-      pause:
-        seconds: 5
-
-    - name: "check the deleted rule is not there"
-      iptables:
-        chain: "{{ rule.chain | default('INPUT') }}"
-        protocol: "{{ rule.protocol | default('tcp') }}"
-        match: "{{ 'multiport' if ',' in rule.dport|string else omit }}"
-        destination_port: "{{ rule.dport }}"
-        comment: "{{ rule.name }}"
-        jump: "{{ rule.jump | default('ACCEPT') }}"
-        state: "{{ rule.state }}"
-      register: iptables
-      failed_when: iptables is changed
-      check_mode: yes
-      loop:
-        - "{{ to_delete[0] | combine({'state':'absent'}) }}"
-      loop_control:
-        loop_var: rule
-
-    - name: "SUCCESSFULLY PASSED TEST 09: ACTION 'DELETE'"
-      pause:
-        seconds: 5
+    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }}: ACTION 'APPEND'"
+      set_fact:
+        number: "{{ number|int + 1 }}"
 
 
 ################################################################################
 # Single rule management actions MUST be globally idempotent: some tasks are
 # always marked as changed, but the role doesn't attempt to apply the buffered
-# ruleset if it didn't changea.  This sequence also ensures that actions adding
+# ruleset if it didn't changed.  This sequence also ensures that actions adding
 # rules (`append`, `insert`) are idempotent between them too.
-- name: "10,11,12. TEST INDEMPOTENCY OF ACTIONS 'APPEND', 'INSERT' AND 'DELETE'"
+- name: "TEST INDEMPOTENCY OF ACTION 'APPEND'"
   hosts: tests
+  gather_facts: no
   become: yes
+  tags:
+    - append
+    - idempotency
+
+  pre_tasks:
+    - name: "check the rule to append is there"
+      iptables:
+        chain: "{{ rule.chain | default('INPUT') }}"
+        protocol: "{{ rule.protocol | default('tcp') }}"
+        match: "{{ 'multiport' if ',' in rule.dport|string else omit }}"
+        destination_port: "{{ rule.dport }}"
+        comment: "{{ rule.name }}"
+        jump: "{{ rule.jump | default('ACCEPT') }}"
+        state: present
+      loop: "{{ rules_web }}"
+      loop_control:
+        loop_var: rule
+
+  roles:
+    - role: iptables_apply
+      iptables_apply__action: append
+      iptables_apply__rules: "{{ rules_web }}"
+
   tasks:
-    - include_role:
-        name: iptables_apply
-      vars:
-        iptables_apply__action: append
-        iptables_apply__rules: "{{ to_append }}"
-
     - name: "idempotency failure"
       fail:
         msg: "There is some lack of idempotency in 'append'"
       when: iptables_ruleset is changed
 
-    - include_role:
-        name: iptables_apply
-      vars:
-        iptables_apply__action: append
-        iptables_apply__rules: "{{ to_insert }}"
-
-    - name: "idempotency failure"
-      fail:
-        msg: "There is some lack of idempotency in 'append'"
-      when: iptables_ruleset is changed
-
-    - name: "SUCCESSFULLY PASSED TEST 10: IDEMPOTENCY OF ACTION 'APPEND'"
-      pause:
-        seconds: 5
-
-    - include_role:
-        name: iptables_apply
-      vars:
-        iptables_apply__action: insert
-        iptables_apply__rules: "{{ to_insert }}"
-
-    - name: "idempotency failure"
-      fail:
-        msg: "There is some lack of idempotency in 'insert'"
-      when: iptables_ruleset is changed
-
-    - include_role:
-        name: iptables_apply
-      vars:
-        iptables_apply__action: insert
-        iptables_apply__rules: "{{ to_append }}"
-
-    - name: "idempotency failure"
-      fail:
-        msg: "There is some lack of idempotency in 'insert'"
-      when: iptables_ruleset is changed
-
-    - name: "SUCCESSFULLY PASSED TEST 11: IDEMPOTENCY OF ACTION 'INSERT'"
-      pause:
-        seconds: 5
-
-    - include_role:
-        name: iptables_apply
-      vars:
-        iptables_apply__action: delete
-        iptables_apply__rules: "{{ to_delete }}"
-
-    - name: "idempotency failure"
-      fail:
-        msg: "There is some lack of idempotency in 'delete'"
-      when: iptables_ruleset is changed
-
-    - name: "SUCCESSFULLY PASSED TEST 12: IDEMPOTENCY OF ACTION 'DELETE'"
-      pause:
-        seconds: 5
+    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }}: IDEMPOTENCY OF ACTION 'APPEND'"
+      set_fact:
+        number: "{{ number|int + 1 }}"
 
 
 ################################################################################
 # Ensure the rollback feature works for every action.  Note that at this step,
 # there is no ssh-specific passing rule but a rule for ports 20:23.  The table
 # needs to be flushed before testing action 'append'.
-- name: "13,14,15. TEST ROLLBACK FOR ACTIONS 'DELETE', 'INSERT' AND 'APPEND'"
+- name: "TEST ROLLBACK FOR ACTION 'APPEND'"
   hosts: tests
+  gather_facts: no
   become: yes
+  tags:
+    - append
+    - rollback
+
+  roles:
+    - role: iptables_apply
+      iptables_apply__action: flush
+
   tasks:
-    - name: "test rollback after bad 'delete'"
-      block:
-        - include_role:
-            name: iptables_apply
-          vars:
-            iptables_apply__action: delete
-            iptables_apply__rules: "{{ to_insert }}"
-      rescue:
-        - name: "expected error"
-          debug:
-            msg: "A rollback occured when trying to delete a needed rule"
-          register: rollback_delete
-
-    - name: "fail if role succeeded"
-      fail:
-        msg: "There is some unexpected issue in rollback feature"
-      when: rollback_delete is undefined
-
-    - name: "SUCCESSFULLY PASSED TEST 13: ROLLBACK OF ACTION 'DELETE'"
-      pause:
-        seconds: 5
-
-    - name: "test rollback after bad 'insert'"
-      block:
-        - include_role:
-            name: iptables_apply
-          vars:
-            iptables_apply__action: insert
-            iptables_apply__rules: |
-              [ {{ to_delete[0] | combine({"jump":"DROP"}) }} ]
-      rescue:
-        - name: "expected error"
-          debug:
-            msg: "A rollback occured when trying to insert a blocking rule"
-          register: rollback_insert
-
-    - name: "fail if role succeeded"
-      fail:
-        msg: "There is some unexpected issue in rollback feature"
-      when: rollback_insert is undefined
-
-    - name: "SUCCESSFULLY PASSED TEST 14: ROLLBACK OF ACTION 'INSERT'"
-      pause:
-        seconds: 5
-
-    - include_role:
-        name: iptables_apply
-      vars:
-        iptables_apply__action: flush
-
     - name: "test rollback after bad 'append'"
       block:
         - include_role:
             name: iptables_apply
           vars:
             iptables_apply__action: append
-            iptables_apply__rules: |
-              [ {{ to_delete[0] | combine({"jump":"DROP"}) }} ]
+            iptables_apply__rules:
+              - "{{ rules_ssh[0] | combine({'jump':'DROP'}) }}"
       rescue:
         - name: "expected error"
           debug:
@@ -502,23 +458,311 @@
         msg: "There is some unexpected issue in rollback feature"
       when: rollback_append is undefined
 
-    - name: "SUCCESSFULLY PASSED TEST 15: ROLLBACK OF ACTION 'APPEND'"
-      pause:
-        seconds: 5
+    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }}: ROLLBACK FOR ACTION 'APPEND'"
+      set_fact:
+        number: "{{ number|int + 1 }}"
+
+
+################################################################################
+# Ensure single rule management actions are working as expected.  We dont check
+# service status here, but only the fact that a rule has been added or removed.
+# This sequence is a junglery that removes ssh-specific passing rule with no
+# error because another one does the job.
+- name: "TEST ACTION 'INSERT'"
+  hosts: tests
+  gather_facts: no
+  become: yes
+  tags:
+    - insert
+    - action
+
+  pre_tasks:
+    - include_role:
+        name: iptables_apply
+
+    - name: "check the rule to insert is not there"
+      iptables:
+        chain: "{{ rule.chain | default('INPUT') }}"
+        protocol: "{{ rule.protocol | default('tcp') }}"
+        match: "{{ 'multiport' if ',' in rule.dport|string else omit }}"
+        destination_port: "{{ rule.dport }}"
+        comment: "{{ rule.name }}"
+        jump: "{{ rule.jump | default('ACCEPT') }}"
+        state: absent
+      register: iptables
+      failed_when: iptables is changed
+      check_mode: yes
+      loop: "{{ to_insert }}"
+      loop_control:
+        loop_var: rule
+
+  roles:
+    - role: iptables_apply
+      iptables_apply__action: insert
+      iptables_apply__rules: "{{ to_insert }}"
+
+  tasks:
+    - name: "check the inserted rule is there"
+      iptables:
+        chain: "{{ rule.chain | default('INPUT') }}"
+        protocol: "{{ rule.protocol | default('tcp') }}"
+        match: "{{ 'multiport' if ',' in rule.dport|string else omit }}"
+        destination_port: "{{ rule.dport }}"
+        comment: "{{ rule.name }}"
+        jump: "{{ rule.jump | default('ACCEPT') }}"
+        state: present
+      register: iptables
+      failed_when: iptables is changed
+      check_mode: yes
+      loop: "{{ to_insert }}"
+      loop_control:
+        loop_var: rule
+
+    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }}: ACTION 'INSERT'"
+      set_fact:
+        number: "{{ number|int + 1 }}"
+
+
+################################################################################
+# Single rule management actions MUST be globally idempotent: some tasks are
+# always marked as changed, but the role doesn't attempt to apply the buffered
+# ruleset if it didn't changed.  This sequence also ensures that actions adding
+# rules (`append`, `insert`) are idempotent between them too.
+- name: "TEST INDEMPOTENCY OF ACTION 'INSERT'"
+  hosts: tests
+  gather_facts: no
+  become: yes
+  tags:
+    - insert
+    - idempotency
+
+  pre_tasks:
+    - name: "check the rule to insert is there"
+      iptables:
+        chain: "{{ rule.chain | default('INPUT') }}"
+        protocol: "{{ rule.protocol | default('tcp') }}"
+        match: "{{ 'multiport' if ',' in rule.dport|string else omit }}"
+        destination_port: "{{ rule.dport }}"
+        comment: "{{ rule.name }}"
+        jump: "{{ rule.jump | default('ACCEPT') }}"
+        state: present
+      loop: "{{ to_insert }}"
+      loop_control:
+        loop_var: rule
+
+  roles:
+    - role: iptables_apply
+      iptables_apply__action: insert
+      iptables_apply__rules: "{{ to_insert }}"
+
+  tasks:
+    - name: "idempotency failure"
+      fail:
+        msg: "There is some lack of idempotency in 'insert'"
+      when: iptables_ruleset is changed
+
+    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }}: IDEMPOTENCY OF ACTION 'INSERT'"
+      set_fact:
+        number: "{{ number|int + 1 }}"
+
+
+################################################################################
+# Ensure the rollback feature works for every action.  Note that at this step,
+# there is no ssh-specific passing rule but a rule for ports 20:23.  The table
+# needs to be flushed before testing action 'append'.
+- name: "TEST ROLLBACK FOR ACTION 'INSERT'"
+  hosts: tests
+  gather_facts: no
+  become: yes
+  tags:
+    - insert
+    - rollback
+
+  tasks:
+    - name: "test rollback after bad 'insert'"
+      block:
+        - include_role:
+            name: iptables_apply
+          vars:
+            iptables_apply__action: insert
+            iptables_apply__rules:
+              - "{{ rules_ssh[0] | combine({'jump':'DROP'}) }}"
+      rescue:
+        - name: "expected error"
+          debug:
+            msg: "A rollback occured when trying to insert a blocking rule"
+          register: rollback_insert
+
+    - name: "fail if role succeeded"
+      fail:
+        msg: "There is some unexpected issue in rollback feature"
+      when: rollback_insert is undefined
+
+    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }}: ROLLBACK FOR ACTION 'INSERT'"
+      set_fact:
+        number: "{{ number|int + 1 }}"
+
+
+################################################################################
+# Ensure single rule management actions are working as expected.  We dont check
+# service status here, but only the fact that a rule has been added or removed.
+# This sequence is a junglery that removes ssh-specific passing rule with no
+# error because another one does the job.
+- name: "TEST ACTION 'DELETE'"
+  hosts: tests
+  gather_facts: no
+  become: yes
+  tags:
+    - delete
+    - action
+
+  pre_tasks:
+    - include_role:
+        name: iptables_apply
+
+    - name: "check the rule to delete is there"
+      iptables:
+        chain: "{{ rule.chain | default('INPUT') }}"
+        protocol: "{{ rule.protocol | default('tcp') }}"
+        match: "{{ 'multiport' if ',' in rule.dport|string else omit }}"
+        destination_port: "{{ rule.dport }}"
+        comment: "{{ rule.name }}"
+        jump: "{{ rule.jump | default('ACCEPT') }}"
+        state: present
+      register: iptables
+      failed_when: iptables is changed
+      check_mode: yes
+      loop: "{{ to_insert }}"
+      loop_control:
+        loop_var: rule
+
+  roles:
+    - role: iptables_apply
+      iptables_apply__action: delete
+      iptables_apply__rules: "{{ to_insert }}"
+
+  tasks:
+    - name: "check the deleted rule is not there"
+      iptables:
+        chain: "{{ rule.chain | default('INPUT') }}"
+        protocol: "{{ rule.protocol | default('tcp') }}"
+        match: "{{ 'multiport' if ',' in rule.dport|string else omit }}"
+        destination_port: "{{ rule.dport }}"
+        comment: "{{ rule.name }}"
+        jump: "{{ rule.jump | default('ACCEPT') }}"
+        state: absent
+      register: iptables
+      failed_when: iptables is changed
+      check_mode: yes
+      loop: "{{ to_insert }}"
+      loop_control:
+        loop_var: rule
+
+    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }}: ACTION 'DELETE'"
+      set_fact:
+        number: "{{ number|int + 1 }}"
+
+
+################################################################################
+# Single rule management actions MUST be globally idempotent: some tasks are
+# always marked as changed, but the role doesn't attempt to apply the buffered
+# ruleset if it didn't changed.  This sequence also ensures that actions adding
+# rules (`append`, `insert`) are idempotent between them too.
+- name: "TEST INDEMPOTENCY OF ACTION 'DELETE'"
+  hosts: tests
+  gather_facts: no
+  become: yes
+  tags:
+    - delete
+    - idempotency
+
+  pre_tasks:
+    - name: "check the rule to delete is not there"
+      iptables:
+        chain: "{{ rule.chain | default('INPUT') }}"
+        protocol: "{{ rule.protocol | default('tcp') }}"
+        match: "{{ 'multiport' if ',' in rule.dport|string else omit }}"
+        destination_port: "{{ rule.dport }}"
+        comment: "{{ rule.name }}"
+        jump: "{{ rule.jump | default('ACCEPT') }}"
+        state: absent
+      loop: "{{ to_insert }}"
+      loop_control:
+        loop_var: rule
+
+  roles:
+    - role: iptables_apply
+      iptables_apply__action: delete
+      iptables_apply__rules: "{{ to_insert }}"
+
+  tasks:
+    - name: "idempotency failure"
+      fail:
+        msg: "There is some lack of idempotency in 'delete'"
+      when: iptables_ruleset is changed
+
+    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }}: IDEMPOTENCY OF ACTION 'DELETE'"
+      set_fact:
+        number: "{{ number|int + 1 }}"
+
+
+################################################################################
+# Ensure the rollback feature works for every action.  Note that at this step,
+# there is no ssh-specific passing rule but a rule for ports 20:23.  The table
+# needs to be flushed before testing action 'append'.
+- name: "TEST ROLLBACK FOR ACTION 'DELETE'"
+  hosts: tests
+  gather_facts: no
+  become: yes
+  tags:
+    - delete
+    - rollback
+
+  roles:
+    - role: iptables_apply
+      iptables_apply__template_once: no
+
+  tasks:
+    - name: "test rollback after bad 'delete'"
+      block:
+        - include_role:
+            name: iptables_apply
+          vars:
+            iptables_apply__action: delete
+            iptables_apply__rules: "{{ rules_ssh }}"
+      rescue:
+        - name: "expected error"
+          debug:
+            msg: "A rollback occured when trying to delete a needed rule"
+          register: rollback_delete
+
+    - name: "fail if role succeeded"
+      fail:
+        msg: "There is some unexpected issue in rollback feature"
+      when: rollback_delete is undefined
+
+    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }}: ROLLBACK FOR ACTION 'DELETE'"
+      set_fact:
+        number: "{{ number|int + 1 }}"
 
 
 ################################################################################
 # Ensure the noflush option works, i.e. templated rules are applied and initial
 # rules are still there.
-- name: "16. TEST OPTION NOFLUSH OF ACTION 'TEMPLATE'"
+- name: "TEST OPTION NOFLUSH OF ACTION 'TEMPLATE'"
   hosts: tests
+  gather_facts: no
   become: yes
+  tags:
+    - template
+    - noflush
+
   roles:
     - role: iptables_apply
       iptables_apply__action: flush
     - role: iptables_apply
       iptables_apply__action: append
-      iptables_apply__rules: "{{ to_append }}"
+      iptables_apply__rules: "{{ rules_web }}"
     - role: iptables_apply
       iptables_apply__noflush: yes
 
@@ -535,19 +779,24 @@
       register: iptables
       failed_when: iptables is changed
       check_mode: yes
-      loop: "{{ to_append }}"
+      loop: "{{ rules_web }}"
       loop_control:
         loop_var: rule
 
-    - name: "SUCCESSFULLY PASSED TEST 16: NO FLUSH OF ACTION 'TEMPLATE'"
-      pause:
-        seconds: 5
+    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }}: NO FLUSH OF ACTION 'TEMPLATE'"
+      set_fact:
+        number: "{{ number|int + 1 }}"
 
 
 ################################################################################
-- name: "17. TEST ROLLBACK WHEN CHANGING POLICY"
+- name: "TEST ROLLBACK WHEN CHANGING POLICY"
   hosts: tests
+  gather_facts: no
   become: yes
+  tags:
+    - rollback
+    - policy
+
   tasks:
     - name: "test rollback after bad policy"
       block:
@@ -572,15 +821,20 @@
         msg: "There is some unexpected issue in rollback feature"
       when: rollback_policy is undefined
 
-    - name: "SUCCESSFULLY PASSED TEST 17: ROLLBACK WITH A BAD POLICY"
-      pause:
-        seconds: 5
+    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }}: ROLLBACK WITH A BAD POLICY"
+      set_fact:
+        number: "{{ number|int + 1 }}"
 
 
 ################################################################################
-- name: "18,19. TEST ROLLBACK TIMEOUTS"
+- name: "TEST ROLLBACK WITH LOWER TIMEOUT"
   hosts: tests
+  gather_facts: no
   become: yes
+  tags:
+    - rollback
+    - timeout
+
   tasks:
     - name: "test rollback timeout (lower limit = {{ lower_timeout | default(5) }})"
       block:
@@ -594,17 +848,28 @@
         - name: "expected error"
           debug:
             msg: "A rollback occured when trying to apply bad ruleset from template"
-          register: rollback_timeout_upper
+          register: rollback_timeout_lower
 
     - name: "fail if role succeeded"
       fail:
         msg: "There is some unexpected issue in rollback feature"
-      when: rollback_timeout_upper is undefined
+      when: rollback_timeout_lower is undefined
 
-    - name: "SUCCESSFULLY PASSED TEST 18: ROLLBACK WITH LOWER TIMEOUT ({{ lower_timeout | default(5) }} seconds)"
-      pause:
-        seconds: 5
+    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }}: ROLLBACK WITH LOWER TIMEOUT ({{ lower_timeout | default(5) }}s)"
+      set_fact:
+        number: "{{ number|int + 1 }}"
 
+
+################################################################################
+- name: "TEST ROLLBACK WITH UPPER TIMEOUT"
+  hosts: tests
+  gather_facts: no
+  become: yes
+  tags:
+    - rollback
+    - timeout
+
+  tasks:
     - name: "test rollback timeout (upper limit = {{ upper_timeout | default(60) }})"
       block:
         - include_role:
@@ -617,25 +882,30 @@
         - name: "expected error"
           debug:
             msg: "A rollback occured when trying to apply bad ruleset from template"
-          register: rollback_timeout_lower
+          register: rollback_timeout_upper
 
     - name: "fail if role succeeded"
       fail:
         msg: "There is some unexpected issue in rollback feature"
-      when: rollback_timeout_lower is undefined
+      when: rollback_timeout_upper is undefined
 
-    - name: "SUCCESSFULLY PASSED TEST 19: ROLLBACK WITH UPPER TIMEOUT ({{ upper_timeout | default(60) }} seconds)"
-      pause:
-        seconds: 5
+    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }}: ROLLBACK WITH UPPER TIMEOUT ({{ upper_timeout | default(60) }}s)"
+      set_fact:
+        number: "{{ number|int + 1 }}"
 
 
 ################################################################################
 # Ensure it is possible to update several rules by playing the role only once,
 # even when neither the 'name' nor the 'dport' match between an old rule and a
 # new rule.
-- name: "20. TEST RULE UPDATE BY ACTION 'APPEND'"
+- name: "TEST RULE UPDATE BY ACTION 'APPEND'"
   hosts: tests
+  gather_facts: no
   become: yes
+  tags:
+    - append
+    - update
+
   vars:
     to_update:
       - name: "SNMP"
@@ -694,13 +964,18 @@
       loop_control:
         loop_var: rule
 
-    - name: "SUCCESSFULLY PASSED TEST 20: UPDATE OF ACTION 'APPEND'"
-      pause:
-        seconds: 5
+    - name: "SUCCESSFULLY PASSED TEST  {{ '%02d' % number|int }}: UPDATE OF ACTION 'APPEND'"
+      set_fact:
+        number: "{{ number|int + 1 }}"
 
 
 ################################################################################
 - hosts: tests
+  tags: always
   tasks:
     - debug:
-        msg: "End Of Playbook: successfully passed all tests for role `iptables_apply`"
+        msg:
+          - "Successfully passed {{ number|int - 1 }} tests"
+          - "role = iptables_apply"
+          - "tags = {{ ansible_run_tags | join(',') }}"
+          - "skip-tags = {{ ansible_skip_tags | join(',') }}"
