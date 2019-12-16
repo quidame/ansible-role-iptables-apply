@@ -45,13 +45,19 @@
   loop_control:
     loop_var: rule
   register: iptables_ruleset
+  diff: yes
 
 
 # If the buffer is not modified, it remains the same than the backup, so the
 # next step will be skipped and this file will not be removed. Do it here.
-- name: "remove temporary buffer"
+- name: "remove temporary backup and buffer if unchanged"
   file:
-    path: "{{ iptables_apply__path_buffer }}"
+    path: "{{ tempfile }}"
     state: absent
+  loop:
+    - "{{ iptables_apply__path_backup }}"
+    - "{{ iptables_apply__path_buffer }}"
+  loop_control:
+    loop_var: tempfile
   when:
     - iptables_ruleset is not changed
