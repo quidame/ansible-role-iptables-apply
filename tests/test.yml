@@ -58,6 +58,8 @@
   gather_facts: no
   become: yes
   tags:
+    - template
+    - flush
     - init
 
   tasks:
@@ -109,6 +111,9 @@
   gather_facts: no
   become: yes
   tags:
+    - append
+    - insert
+    - delete
     - init
 
   tasks:
@@ -345,9 +350,6 @@
         comment: "{{ rule.name }}"
         jump: "{{ rule.jump | default('ACCEPT') }}"
         state: absent
-      register: iptables
-      failed_when: iptables is changed
-      check_mode: yes
       loop: "{{ rules_web }}"
       loop_control:
         loop_var: rule
@@ -489,9 +491,6 @@
         comment: "{{ rule.name }}"
         jump: "{{ rule.jump | default('ACCEPT') }}"
         state: absent
-      register: iptables
-      failed_when: iptables is changed
-      check_mode: yes
       loop: "{{ to_insert }}"
       loop_control:
         loop_var: rule
@@ -629,9 +628,6 @@
         comment: "{{ rule.name }}"
         jump: "{{ rule.jump | default('ACCEPT') }}"
         state: present
-      register: iptables
-      failed_when: iptables is changed
-      check_mode: yes
       loop: "{{ to_insert }}"
       loop_control:
         loop_var: rule
@@ -805,7 +801,6 @@
           vars:
             iptables_apply__template_once: no
             iptables_apply__template_core: no
-            iptables_apply__template_rules: []
             iptables_apply__template_policy:
               input: ACCEPT
               forward: ACCEPT
@@ -927,9 +922,6 @@
         comment: "{{ rule.name }}"
         jump: "{{ rule.jump | default('ACCEPT') }}"
         state: "{{ rule.state }}"
-      register: iptables
-      failed_when: iptables is changed
-      check_mode: yes
       loop:
         - "{{ iptables_apply__template_rules[0] | combine({'state':'present'}) }}"
         - "{{ iptables_apply__template_rules[1] | combine({'state':'present'}) }}"
