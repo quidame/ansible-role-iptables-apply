@@ -4,7 +4,7 @@
 # `REJECT` target.  Triggered rollbacks are handled in blocks.
 ---
 ################################################################################
-- name: "PREPARE THE FIELD"
+- name: "00. PREPARE THE FIELD"
   hosts: tests
   become: yes
   tags: always
@@ -53,7 +53,7 @@
 
 
 ################################################################################
-- name: "TEST INITIALIZATION FROM NULL STATE WITH ACTION 'TEMPLATE'"
+- name: "01. TEST INITIALIZATION FROM NULL STATE WITH ACTION 'TEMPLATE'"
   hosts: tests
   gather_facts: no
   become: yes
@@ -100,13 +100,13 @@
       register: replace
       failed_when: replace is not changed
 
-    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }}: INITIALIZATION FROM NULL STATE WITH ACTION 'TEMPLATE'"
+    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/01): INITIALIZATION FROM NULL STATE WITH ACTION 'TEMPLATE'"
       set_fact:
         number: "{{ number|int + 1 }}"
 
 
 ################################################################################
-- name: "TEST INITIALIZATION FROM NULL STATE WITH ACTION 'APPEND'"
+- name: "02. TEST INITIALIZATION FROM NULL STATE WITH ACTION 'APPEND'"
   hosts: tests
   gather_facts: no
   become: yes
@@ -162,13 +162,13 @@
       register: lineinfile
       failed_when: lineinfile is not changed
 
-    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }}: INITIALIZATION FROM NULL STATE WITH ACTION 'APPEND'"
+    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/02): INITIALIZATION FROM NULL STATE WITH ACTION 'APPEND'"
       set_fact:
         number: "{{ number|int + 1 }}"
 
 
 ################################################################################
-- name: "TEST ACTION 'TEMPLATE'"
+- name: "03. TEST ACTION 'TEMPLATE'"
   hosts: tests
   gather_facts: no
   become: yes
@@ -211,13 +211,13 @@
       failed_when: service_status is changed
       check_mode: yes
 
-    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }}: ACTION 'TEMPLATE'"
+    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/03): ACTION 'TEMPLATE'"
       set_fact:
         number: "{{ number|int + 1 }}"
 
 
 ################################################################################
-- name: "TEST INDEMPOTENCY OF ACTION 'TEMPLATE'"
+- name: "04. TEST INDEMPOTENCY OF ACTION 'TEMPLATE'"
   hosts: tests
   gather_facts: no
   become: yes
@@ -234,14 +234,14 @@
         msg: "There is some lack of idempotency in 'template'"
       when: iptables_ruleset is changed
 
-    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }}: IDEMPOTENCY OF ACTION 'TEMPLATE'"
+    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/04): IDEMPOTENCY OF ACTION 'TEMPLATE'"
       set_fact:
         number: "{{ number|int + 1 }}"
 
 
 ################################################################################
 # Ensure the parameter that forces to reapply the template is working.
-- name: "TEST OVERWRITE OF ACTION 'TEMPLATE'"
+- name: "05. TEST OVERWRITE OF ACTION 'TEMPLATE'"
   hosts: tests
   gather_facts: no
   become: yes
@@ -259,14 +259,14 @@
         msg: "There is some lack of *force overwrite* in 'template'"
       when: iptables_ruleset is not changed
 
-    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }}: OVERWRITE OF ACTION 'TEMPLATE'"
+    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/05): OVERWRITE OF ACTION 'TEMPLATE'"
       set_fact:
         number: "{{ number|int + 1 }}"
 
 
 ################################################################################
 # Ensure the most expected feature is working fine.
-- name: "TEST ROLLBACK FOR ACTION 'TEMPLATE'"
+- name: "06. TEST ROLLBACK FOR ACTION 'TEMPLATE'"
   hosts: tests
   gather_facts: no
   become: yes
@@ -293,13 +293,13 @@
         msg: "There is some unexpected issue in rollback feature"
       when: rollback_template is undefined
 
-    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }}: ROLLBACK FOR ACTION 'TEMPLATE'"
+    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/06): ROLLBACK FOR ACTION 'TEMPLATE'"
       set_fact:
         number: "{{ number|int + 1 }}"
 
 
 ################################################################################
-- name: "TEST ACTION 'FLUSH'"
+- name: "07. TEST ACTION 'FLUSH'"
   hosts: tests
   gather_facts: no
   become: yes
@@ -326,13 +326,13 @@
       register: service_status
       failed_when: service_status is changed
 
-    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }}: ACTION 'FLUSH'"
+    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/07): ACTION 'FLUSH'"
       set_fact:
         number: "{{ number|int + 1 }}"
 
 
 ################################################################################
-- name: "TEST ACTION 'APPEND'"
+- name: "08. TEST ACTION 'APPEND'"
   hosts: tests
   gather_facts: no
   become: yes
@@ -376,7 +376,7 @@
       loop_control:
         loop_var: rule
 
-    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }}: ACTION 'APPEND'"
+    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/08): ACTION 'APPEND'"
       set_fact:
         number: "{{ number|int + 1 }}"
 
@@ -386,7 +386,7 @@
 # always marked as changed, but the role doesn't attempt to apply the buffered
 # ruleset if it didn't changed.  This sequence also ensures that actions adding
 # rules (`append`, `insert`) are idempotent between them too.
-- name: "TEST INDEMPOTENCY OF ACTION 'APPEND'"
+- name: "09. TEST INDEMPOTENCY OF ACTION 'APPEND'"
   hosts: tests
   gather_facts: no
   become: yes
@@ -419,7 +419,7 @@
         msg: "There is some lack of idempotency in 'append'"
       when: iptables_ruleset is changed
 
-    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }}: IDEMPOTENCY OF ACTION 'APPEND'"
+    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/09): IDEMPOTENCY OF ACTION 'APPEND'"
       set_fact:
         number: "{{ number|int + 1 }}"
 
@@ -428,7 +428,7 @@
 # Ensure the rollback feature works for every action.  Note that at this step,
 # there is no ssh-specific passing rule but a rule for ports 20:23.  The table
 # needs to be flushed before testing action 'append'.
-- name: "TEST ROLLBACK FOR ACTION 'APPEND'"
+- name: "10. TEST ROLLBACK FOR ACTION 'APPEND'"
   hosts: tests
   gather_facts: no
   become: yes
@@ -460,7 +460,7 @@
         msg: "There is some unexpected issue in rollback feature"
       when: rollback_append is undefined
 
-    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }}: ROLLBACK FOR ACTION 'APPEND'"
+    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/10): ROLLBACK FOR ACTION 'APPEND'"
       set_fact:
         number: "{{ number|int + 1 }}"
 
@@ -470,7 +470,7 @@
 # service status here, but only the fact that a rule has been added or removed.
 # This sequence is a junglery that removes ssh-specific passing rule with no
 # error because another one does the job.
-- name: "TEST ACTION 'INSERT'"
+- name: "11. TEST ACTION 'INSERT'"
   hosts: tests
   gather_facts: no
   become: yes
@@ -517,7 +517,7 @@
       loop_control:
         loop_var: rule
 
-    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }}: ACTION 'INSERT'"
+    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/11): ACTION 'INSERT'"
       set_fact:
         number: "{{ number|int + 1 }}"
 
@@ -527,7 +527,7 @@
 # always marked as changed, but the role doesn't attempt to apply the buffered
 # ruleset if it didn't changed.  This sequence also ensures that actions adding
 # rules (`append`, `insert`) are idempotent between them too.
-- name: "TEST INDEMPOTENCY OF ACTION 'INSERT'"
+- name: "12. TEST INDEMPOTENCY OF ACTION 'INSERT'"
   hosts: tests
   gather_facts: no
   become: yes
@@ -560,7 +560,7 @@
         msg: "There is some lack of idempotency in 'insert'"
       when: iptables_ruleset is changed
 
-    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }}: IDEMPOTENCY OF ACTION 'INSERT'"
+    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/12): IDEMPOTENCY OF ACTION 'INSERT'"
       set_fact:
         number: "{{ number|int + 1 }}"
 
@@ -569,7 +569,7 @@
 # Ensure the rollback feature works for every action.  Note that at this step,
 # there is no ssh-specific passing rule but a rule for ports 20:23.  The table
 # needs to be flushed before testing action 'append'.
-- name: "TEST ROLLBACK FOR ACTION 'INSERT'"
+- name: "13. TEST ROLLBACK FOR ACTION 'INSERT'"
   hosts: tests
   gather_facts: no
   become: yes
@@ -597,7 +597,7 @@
         msg: "There is some unexpected issue in rollback feature"
       when: rollback_insert is undefined
 
-    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }}: ROLLBACK FOR ACTION 'INSERT'"
+    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/13): ROLLBACK FOR ACTION 'INSERT'"
       set_fact:
         number: "{{ number|int + 1 }}"
 
@@ -607,7 +607,7 @@
 # service status here, but only the fact that a rule has been added or removed.
 # This sequence is a junglery that removes ssh-specific passing rule with no
 # error because another one does the job.
-- name: "TEST ACTION 'DELETE'"
+- name: "14. TEST ACTION 'DELETE'"
   hosts: tests
   gather_facts: no
   become: yes
@@ -654,7 +654,7 @@
       loop_control:
         loop_var: rule
 
-    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }}: ACTION 'DELETE'"
+    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/14): ACTION 'DELETE'"
       set_fact:
         number: "{{ number|int + 1 }}"
 
@@ -664,7 +664,7 @@
 # always marked as changed, but the role doesn't attempt to apply the buffered
 # ruleset if it didn't changed.  This sequence also ensures that actions adding
 # rules (`append`, `insert`) are idempotent between them too.
-- name: "TEST INDEMPOTENCY OF ACTION 'DELETE'"
+- name: "15. TEST INDEMPOTENCY OF ACTION 'DELETE'"
   hosts: tests
   gather_facts: no
   become: yes
@@ -697,7 +697,7 @@
         msg: "There is some lack of idempotency in 'delete'"
       when: iptables_ruleset is changed
 
-    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }}: IDEMPOTENCY OF ACTION 'DELETE'"
+    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/15): IDEMPOTENCY OF ACTION 'DELETE'"
       set_fact:
         number: "{{ number|int + 1 }}"
 
@@ -706,7 +706,7 @@
 # Ensure the rollback feature works for every action.  Note that at this step,
 # there is no ssh-specific passing rule but a rule for ports 20:23.  The table
 # needs to be flushed before testing action 'append'.
-- name: "TEST ROLLBACK FOR ACTION 'DELETE'"
+- name: "16. TEST ROLLBACK FOR ACTION 'DELETE'"
   hosts: tests
   gather_facts: no
   become: yes
@@ -737,7 +737,7 @@
         msg: "There is some unexpected issue in rollback feature"
       when: rollback_delete is undefined
 
-    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }}: ROLLBACK FOR ACTION 'DELETE'"
+    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/16): ROLLBACK FOR ACTION 'DELETE'"
       set_fact:
         number: "{{ number|int + 1 }}"
 
@@ -745,7 +745,7 @@
 ################################################################################
 # Ensure the noflush option works, i.e. templated rules are applied and initial
 # rules are still there.
-- name: "TEST OPTION NOFLUSH OF ACTION 'TEMPLATE'"
+- name: "17. TEST OPTION NOFLUSH OF ACTION 'TEMPLATE'"
   hosts: tests
   gather_facts: no
   become: yes
@@ -779,13 +779,13 @@
       loop_control:
         loop_var: rule
 
-    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }}: NO FLUSH OF ACTION 'TEMPLATE'"
+    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/17): NO FLUSH OF ACTION 'TEMPLATE'"
       set_fact:
         number: "{{ number|int + 1 }}"
 
 
 ################################################################################
-- name: "TEST ROLLBACK WHEN CHANGING POLICY"
+- name: "18. TEST ROLLBACK WHEN CHANGING POLICY"
   hosts: tests
   gather_facts: no
   become: yes
@@ -816,13 +816,13 @@
         msg: "There is some unexpected issue in rollback feature"
       when: rollback_policy is undefined
 
-    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }}: ROLLBACK WITH A BAD POLICY"
+    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/18): ROLLBACK WITH A BAD POLICY"
       set_fact:
         number: "{{ number|int + 1 }}"
 
 
 ################################################################################
-- name: "TEST ROLLBACK WITH LOWER TIMEOUT"
+- name: "19. TEST ROLLBACK WITH LOWER TIMEOUT"
   hosts: tests
   gather_facts: no
   become: yes
@@ -850,13 +850,13 @@
         msg: "There is some unexpected issue in rollback feature"
       when: rollback_timeout_lower is undefined
 
-    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }}: ROLLBACK WITH LOWER TIMEOUT ({{ lower_timeout | default(5) }}s)"
+    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/19): ROLLBACK WITH LOWER TIMEOUT ({{ lower_timeout | default(5) }}s)"
       set_fact:
         number: "{{ number|int + 1 }}"
 
 
 ################################################################################
-- name: "TEST ROLLBACK WITH UPPER TIMEOUT"
+- name: "20. TEST ROLLBACK WITH UPPER TIMEOUT"
   hosts: tests
   gather_facts: no
   become: yes
@@ -884,7 +884,7 @@
         msg: "There is some unexpected issue in rollback feature"
       when: rollback_timeout_upper is undefined
 
-    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }}: ROLLBACK WITH UPPER TIMEOUT ({{ upper_timeout | default(60) }}s)"
+    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/20): ROLLBACK WITH UPPER TIMEOUT ({{ upper_timeout | default(60) }}s)"
       set_fact:
         number: "{{ number|int + 1 }}"
 
@@ -893,7 +893,7 @@
 # Ensure it is possible to update several rules by playing the role only once,
 # even when neither the 'name' nor the 'dport' match between an old rule and a
 # new rule.
-- name: "TEST RULE UPDATE BY ACTION 'APPEND'"
+- name: "21. TEST RULE UPDATE BY ACTION 'APPEND'"
   hosts: tests
   gather_facts: no
   become: yes
@@ -956,18 +956,20 @@
       loop_control:
         loop_var: rule
 
-    - name: "SUCCESSFULLY PASSED TEST  {{ '%02d' % number|int }}: UPDATE OF ACTION 'APPEND'"
+    - name: "SUCCESSFULLY PASSED TEST  {{ '%02d' % number|int }} (/21): UPDATE OF ACTION 'APPEND'"
       set_fact:
         number: "{{ number|int + 1 }}"
 
 
 ################################################################################
-- hosts: tests
+- name: "CONGRATULATIONS"
+  hosts: tests
   tags: always
   tasks:
-    - debug:
+    - name: "results overview"
+      debug:
         msg:
-          - "Successfully passed {{ number|int - 1 }} tests"
+          - "Successfully passed {{ number|int - 1 }} (/21) tests"
           - "role = iptables_apply"
           - "tags = {{ ansible_run_tags | join(',') }}"
           - "skip-tags = {{ ansible_skip_tags | join(',') }}"
