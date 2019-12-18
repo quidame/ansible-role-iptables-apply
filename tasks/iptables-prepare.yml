@@ -9,7 +9,6 @@
     - import_tasks: iptables-init.yml
 
   rescue:
-
     - name: "initialize firewall from NULL state"
       command: iptables-restore
       args:

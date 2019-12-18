@@ -24,6 +24,7 @@
   async: 1
   poll: 0
   changed_when: true
+  when: iptables_ruleset is changed
 
 
 # This will ensure to not reuse a connected socket that could still be usable
@@ -38,7 +39,7 @@
 # module is unusable here, since if a host is unreachable before the rollback,
 # the next task comes too late for all other hosts: rollbacks already happened
 # on all of them, whatever safe or not the applied ruleset was.
-- name: "2. confirm applied ruleset and disable rollback"
+- name: "2. confirm current ruleset and disable rollback by removing temporary cookies (backup and buffer)"
   file:
     path: "{{ tempfile }}"
     state: absent
@@ -51,12 +52,3 @@
   failed_when: confirm is not changed
   vars:
     ansible_timeout: "{{ iptables_apply__timeout|int * 2 }}"
-
-
-- name: "3. confirm applied ruleset as persistent"
-  command: "service {{ iptables_apply__service }} save"
-  changed_when: true
-  args:
-    warn: no
-  when:
-    - iptables_apply__persist|bool

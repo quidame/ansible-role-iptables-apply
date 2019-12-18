@@ -1,9 +1,8 @@
 ---
-- name: "confirm applied ruleset as persistent"
+- name: "confirm current ruleset as persistent"
   command: "service {{ iptables_apply__service }} save"
   changed_when: true
   args:
     warn: no
   when:
-    - iptables_ruleset is changed
     - iptables_apply__persist|bool
