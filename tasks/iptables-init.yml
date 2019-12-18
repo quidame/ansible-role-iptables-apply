@@ -7,11 +7,11 @@
 # The first file will be used in case of rollback, and the second one, as the
 # starting point for atomic changes with actions `append`, `insert` or `delete`.
 # Actions `template` and `flush` will overwrite it entirely.
-- name: "save initial state of the firewall"
+- name: "save initial state of the firewall into temporary backup and buffer"
   shell: >
     iptables-save {{ '' if iptables_apply__action in ['template','flush'] else '-t filter' }} |
     tee {{ iptables_apply__path_backup }} {{ iptables_apply__path_buffer }}
-  register: saved_state
+  register: iptables_apply__saved_state
   changed_when: true
   failed_when:
-    - saved_state.stdout_lines | length < 7
+    - iptables_apply__saved_state.stdout_lines | length < 7

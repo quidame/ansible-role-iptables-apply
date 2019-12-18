@@ -9,7 +9,7 @@
   shell: >
     (
       iptables-restore {{ '--noflush' if iptables_apply__noflush|bool and
-        iptables_apply__template_mark not in saved_state.stdout_lines
+        iptables_apply__template_mark not in iptables_apply__saved_state.stdout_lines
         else '' }} {{ iptables_apply__path_buffer }} ||
       rm -f {{ iptables_apply__path_buffer }}
 
@@ -24,7 +24,7 @@
   async: 1
   poll: 0
   changed_when: true
-  when: iptables_ruleset is changed
+  when: iptables_apply__ruleset is changed
 
 
 # This will ensure to not reuse a connected socket that could still be usable
@@ -41,14 +41,14 @@
 # on all of them, whatever safe or not the applied ruleset was.
 - name: "2. confirm current ruleset and disable rollback by removing temporary cookies (backup and buffer)"
   file:
-    path: "{{ tempfile }}"
+    path: "{{ iptables_apply_item }}"
     state: absent
   loop:
     - "{{ iptables_apply__path_backup }}"
     - "{{ iptables_apply__path_buffer }}"
   loop_control:
-    loop_var: tempfile
-  register: confirm
-  failed_when: confirm is not changed
+    loop_var: iptables_apply_item
+  register: iptables_apply__confirm
+  failed_when: iptables_apply__confirm is not changed
   vars:
     ansible_timeout: "{{ iptables_apply__timeout|int * 2 }}"

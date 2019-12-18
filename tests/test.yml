@@ -232,7 +232,7 @@
     - name: "idempotency failure"
       fail:
         msg: "There is some lack of idempotency in 'template'"
-      when: iptables_ruleset is changed
+      when: iptables_apply__ruleset is changed
 
     - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/04): IDEMPOTENCY OF ACTION 'TEMPLATE'"
       set_fact:
@@ -257,7 +257,7 @@
     - name: "force-overwrite failure"
       fail:
         msg: "There is some lack of *force overwrite* in 'template'"
-      when: iptables_ruleset is not changed
+      when: iptables_apply__ruleset is not changed
 
     - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/05): OVERWRITE OF ACTION 'TEMPLATE'"
       set_fact:
@@ -417,7 +417,7 @@
     - name: "idempotency failure"
       fail:
         msg: "There is some lack of idempotency in 'append'"
-      when: iptables_ruleset is changed
+      when: iptables_apply__ruleset is changed
 
     - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/09): IDEMPOTENCY OF ACTION 'APPEND'"
       set_fact:
@@ -558,7 +558,7 @@
     - name: "idempotency failure"
       fail:
         msg: "There is some lack of idempotency in 'insert'"
-      when: iptables_ruleset is changed
+      when: iptables_apply__ruleset is changed
 
     - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/12): IDEMPOTENCY OF ACTION 'INSERT'"
       set_fact:
@@ -695,7 +695,7 @@
     - name: "idempotency failure"
       fail:
         msg: "There is some lack of idempotency in 'delete'"
-      when: iptables_ruleset is changed
+      when: iptables_apply__ruleset is changed
 
     - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/15): IDEMPOTENCY OF ACTION 'DELETE'"
       set_fact:

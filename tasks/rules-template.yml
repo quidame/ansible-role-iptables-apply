@@ -4,7 +4,7 @@
     src: "{{ iptables_apply__template }}"
     dest: "{{ iptables_apply__path_buffer }}"
     validate: "iptables-restore --test %s"
-  register: iptables_ruleset
+  register: iptables_apply__ruleset
   when:
     - ( not iptables_apply__template_once|bool ) or
-      ( not iptables_apply__template_mark in saved_state.stdout_lines )
+      ( not iptables_apply__template_mark in iptables_apply__saved_state.stdout_lines )

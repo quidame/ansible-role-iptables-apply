@@ -4,4 +4,4 @@
     src: "{{ iptables_apply__flush }}"
     dest: "{{ iptables_apply__path_buffer }}"
     validate: "iptables-restore --test %s"
-  register: iptables_ruleset
+  register: iptables_apply__ruleset

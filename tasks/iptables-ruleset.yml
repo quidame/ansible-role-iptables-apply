@@ -13,23 +13,25 @@
     # destination port(s) OR its comment, all other parameters remaining
     # unchanged.
     regexp: "^(-A {{
-      rule.chain|default('INPUT') }} -p {{
-      rule.protocol|default('tcp') }} -m (multiport|{{
-      rule.protocol|default('tcp') }}) --dports? (({{
-      rule.dport }} -m comment --comment .*)|(.* -m comment --comment (\"?){{
-      rule.name }}\\6)) -j {{
-      rule.jump|default('ACCEPT') }})$"
+      iptables_apply_item.chain|default('INPUT') }} -p {{
+      iptables_apply_item.protocol|default('tcp') }} -m (multiport|{{
+      iptables_apply_item.protocol|default('tcp') }}) --dports? (({{
+      iptables_apply_item.dport }} -m comment --comment .*)|(.* -m comment --comment (\"?){{
+      iptables_apply_item.name }}\\6)) -j {{
+      iptables_apply_item.jump|default('ACCEPT') }})$"
     # The build `rule.name|wordcount` allows our task to mimic iptables command
     # behaviour regarding double quotes enclosure.  It's a good approximation,
     # but fails idempotency for names such as `foo-bar`, since `-` is a word
     # separator for jinja2, not for iptables.
     line: "-A {{
-      rule.chain|default('INPUT') }} -p {{
-      rule.protocol|default('tcp') }} -m {{
-      'multiport --dports %s' % rule.dport if ',' in rule.dport|string else
-      '%s --dport %s' % (rule.protocol|default('tcp'), rule.dport) }} -m comment --comment {{
-      rule.name|regex_replace('^|$', '\"') if rule.name|wordcount != 1 else rule.name }} -j {{
-      rule.jump|default('ACCEPT') }}"
+      iptables_apply_item.chain|default('INPUT') }} -p {{
+      iptables_apply_item.protocol|default('tcp') }} -m {{ 'multiport --dports %s' %
+      iptables_apply_item.dport if ',' in iptables_apply_item.dport|string else '%s --dport %s' % (
+      iptables_apply_item.protocol|default('tcp'),
+      iptables_apply_item.dport) }} -m comment --comment {{
+      iptables_apply_item.name|regex_replace('^|$', '\"') if iptables_apply_item.name|wordcount != 1 else
+      iptables_apply_item.name }} -j {{
+      iptables_apply_item.jump|default('ACCEPT') }}"
     state: "{{ 'absent' if iptables_apply__action == 'delete' else 'present' }}"
     # `insertafter` and `insertbefore` are mutually exclusive, so 'omit' one of
     # them is mandatory. In the filter table, all rules take place between the
@@ -43,6 +45,6 @@
     validate: "iptables-restore --test %s"
   loop: "{{ iptables_apply__rules }}"
   loop_control:
-    loop_var: rule
-  register: iptables_ruleset
+    loop_var: iptables_apply_item
+  register: iptables_apply__ruleset
   diff: yes
