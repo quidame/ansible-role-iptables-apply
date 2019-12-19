@@ -341,7 +341,7 @@ To make use of this role as a galaxy role, put the following lines in
 ```yaml
 - name: iptables_apply
   src: https://github.com/quidame/ansible-role-iptables_apply.git
-  version: 1.2.1
+  version: 1.5.0
   scm: git
 ```
 
