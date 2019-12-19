@@ -36,7 +36,7 @@ This role comes with the following features:
 
 - rollback in case of failure
 - full firewall configuration from scratch
-- blind firewall sanitization by inserting a core of sanity rules  *before*
+- blind firewall sanitization by inserting a core of sanity rules *before*
   the current ones, that remain unchanged but may as well never be reached
   anymore.
 - per-rule firewall management, allowing other roles to add or remove rules
@@ -49,15 +49,6 @@ Requirements
 
 Firewall management service (`iptables` or `netfilter-persistent`) must be
 installed apart.
-
-With Ansible version prior to `2.5.6`, a control socket MUST be set either in
-`ANSIBLE_SSH_ARGS` environment variable, or in `ssh_args` setting of the
-`[ssh_connection]` in `ansible.cfg`. For example:
-
-```ini
-[ssh_connection]
-ssh_args = -o ControlMaster=auto
-```
 
 Role Variables
 --------------
@@ -235,13 +226,13 @@ iptables_apply__template_policy:
 iptables_apply__template_once: true
 ```
 
-* This variable defines a regexp that should be found in the `iptables-save`
+* This variable defines a string that should be found in the `iptables-save`
   output to know/decide if the templated ruleset is already in use. Defaults
-  to the value of the comment of the rule dropping TCP packets in state NEW
-  and not coming with only the `SYN` flag.
+  to the rule dropping TCP packets in state NEW and not coming with only the
+  `SYN` flag:
 
 ```yaml
-iptables_apply__template_mark: '"bad NEWs"'
+iptables_apply__template_mark: '-A INPUT -p tcp -m tcp ! --tcp-flags FIN,SYN,RST,ACK SYN -m comment --comment "bad NEWs" -j DROP'
 ```
 
 * This defines the path of an alternative template used to flush rules and
