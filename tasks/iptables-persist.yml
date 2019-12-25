@@ -4,5 +4,3 @@
   changed_when: true
   args:
     warn: no
-  when:
-    - iptables_apply__persist|bool
