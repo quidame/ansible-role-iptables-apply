@@ -193,12 +193,12 @@ iptables_apply__template_rules: "{{ iptables_apply__rules }}"
   the playbook nor its commandline call).
 
 ```yaml
-iptables_apply__noflush: false
+iptables_apply__template_noflush: false
 ```
 
 * Whether or not to apply the core ruleset provided by the template. The core
   rules, a.k.a. sanity rules, are inserted to ensure they will be evaluated
-  first even if `iptables_apply__noflush` is true.  Defaults to `true`.
+  first even if `iptables_apply__template_noflush` is true.  Defaults to `true`.
 
 ```yaml
 iptables_apply__template_core: true
@@ -206,8 +206,7 @@ iptables_apply__template_core: true
 
 * The default policy to apply for each chain of the filter table.  If a policy
   is undefined in this variable, then it will not be changed on the target. For
-  example, to keep all current policies (useful with `iptables_apply__noflush`
-  set to `True`): `iptables_apply__template_policy: {}`
+  example, to keep all current policies: `iptables_apply__template_policy: {}`
 
 ```yaml
 iptables_apply__template_policy:
@@ -278,7 +277,7 @@ Apply the same ruleset on an already configured firewall you want to keep.
 - hosts: servers
   roles:
     - role: iptables_apply
-      iptables_apply__noflush: yes
+      iptables_apply__template_noflush: yes
 ```
 
 Apply core ruleset and some passing rules for monitoring tools.

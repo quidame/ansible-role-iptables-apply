@@ -1,6 +1,6 @@
 # vim: ft=sh
 (
-  iptables-restore {{ '--noflush' if iptables_apply__noflush|bool and
+  iptables-restore {{ '--noflush' if iptables_apply__template_noflush | bool and
     iptables_apply__template_mark not in iptables_apply__saved_state.stdout_lines
     else '' }} {{ iptables_apply__path_buffer }} ||
   rm -f {{ iptables_apply__path_buffer }}
