@@ -1,0 +1,15 @@
+# vim: ft=sh
+(
+  iptables-restore {{ '--noflush' if iptables_apply__noflush|bool and
+    iptables_apply__template_mark not in iptables_apply__saved_state.stdout_lines
+    else '' }} {{ iptables_apply__path_buffer }} ||
+  rm -f {{ iptables_apply__path_buffer }}
+
+  while test ${i:=0} -lt {{ iptables_apply__timeout|int }} && i=$((i+1)); do
+    sleep 1
+    test -e {{ iptables_apply__path_backup }} || exit 0
+  done
+
+  iptables-restore {{ iptables_apply__path_backup }} &&
+  rm -f {{ iptables_apply__path_backup }}
+) &

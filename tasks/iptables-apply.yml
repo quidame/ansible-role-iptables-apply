@@ -6,21 +6,7 @@
 # either roll back or validate the rules and in the same time cleanup the file,
 # since attempts to remove it AFTER the failure may come too late.
 - name: "1. apply iptables ruleset and wait for confirmation"
-  shell: >
-    (
-      iptables-restore {{ '--noflush' if iptables_apply__noflush|bool and
-        iptables_apply__template_mark not in iptables_apply__saved_state.stdout_lines
-        else '' }} {{ iptables_apply__path_buffer }} ||
-      rm -f {{ iptables_apply__path_buffer }}
-
-      while test ${i:=0} -lt {{ iptables_apply__timeout|int }} && i=$((i+1)); do
-        sleep 1
-        test -e {{ iptables_apply__path_backup }} || exit 0
-      done
-
-      iptables-restore {{ iptables_apply__path_backup }} &&
-      rm -f {{ iptables_apply__path_backup }}
-    ) &
+  shell: "{{ lookup('template', 'iptables-apply.j2') }}"
   async: 1
   poll: 0
   changed_when: true
