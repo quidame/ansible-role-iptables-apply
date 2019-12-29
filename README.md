@@ -334,14 +334,14 @@ rule's `action` and `state` to it.
     iptables_apply__module_rules:
       - action: insert
         chain: INPUT
-	protocol: tcp
-	source_port: "1024:"
-	destination_port: 5432
-	ctstate: NEW
-	syn: match
-	comment: "postgresql.service"
+        protocol: tcp
+        source_port: "1024:"
+        destination_port: 5432
+        ctstate: NEW
+        syn: match
+        comment: "postgresql.service"
         jump: ACCEPT
-	state: present
+        state: present
 ```
 
 Do whatever you want with a custom template. It may as well include policies
@@ -365,7 +365,7 @@ Manage persistence of the current ruleset:
   tasks:
     - include_role:
         name: iptables_apply
-	tasks_from: iptables-persist.yml
+        tasks_from: iptables-persist.yml
 ```
 
 Or manage the service (for example disable it and keep it started):
@@ -377,7 +377,7 @@ Or manage the service (for example disable it and keep it started):
   tasks:
     - include_role:
         name: iptables_apply
-	tasks_from: iptables-service.yml
+        tasks_from: iptables-service.yml
       vars:
         iptables_apply__service_enabled: false
         iptables_apply__service_started: true
