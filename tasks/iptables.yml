@@ -1,0 +1,76 @@
+---
+# This tasks file can be played by calling the role as:
+# - include_role:
+#     name: iptables_apply
+#     tasks_from: iptables.yml
+#   vars:
+#     iptables_apply__module_rules:
+#       - chain: INPUT
+#         protocol: tcp
+#         destination_port: 80
+#         comment: "Nginx HTTP"
+#         jump: ACCEPT
+#         state: present
+#       - chain: INPUT
+#         protocol: tcp
+#         destination_port: 443
+#         comment: "Nginx HTTPS"
+#         jump: ACCEPT
+#         state: present
+#
+# NOTE that Ansible's iptables module doesn't support iptables's multiport
+# module. So you have to append 2 rules for 2 ports of the same service. This
+# is mainly why we use another variable (iptables_apply__module_rules) to store
+# the rules, since iptables_apply__rules's dport key supports multiport and as
+# such is not reusable here.
+#
+- name: "setup firewall with the dedicated ansible module (no rollback)"
+  iptables:
+    action:              "{{ iptables_apply_item.action              | d(omit) }}"
+    chain:               "{{ iptables_apply_item.chain               | d(omit) }}"
+    comment:             "{{ iptables_apply_item.comment             | d(omit) }}"
+    ctstate:             "{{ iptables_apply_item.ctstate             | d(omit) }}"
+    destination:         "{{ iptables_apply_item.destination         | d(omit) }}"
+    destination_port:    "{{ iptables_apply_item.destination_port    | d(omit) }}"
+    flush:               "{{ iptables_apply_item.flush               | d(omit) }}"
+    fragment:            "{{ iptables_apply_item.fragment            | d(omit) }}"
+    goto:                "{{ iptables_apply_item.goto                | d(omit) }}"
+    icmp_type:           "{{ iptables_apply_item.icmp_type           | d(omit) }}"
+    in_interface:        "{{ iptables_apply_item.in_interface        | d(omit) }}"
+    ip_version:          "{{ iptables_apply_item.ip_version          | d(omit) }}"
+    jump:                "{{ iptables_apply_item.jump                | d(omit) }}"
+    limit:               "{{ iptables_apply_item.limit               | d(omit) }}"
+    limit_burst:         "{{ iptables_apply_item.limit_burst         | d(omit) }}"
+    log_prefix:          "{{ iptables_apply_item.log_prefix          | d(omit) }}"
+    match:               "{{ iptables_apply_item.match               | d(omit) }}"
+    out_interface:       "{{ iptables_apply_item.out_interface       | d(omit) }}"
+    policy:              "{{ iptables_apply_item.policy              | d(omit) }}"
+    protocol:            "{{ iptables_apply_item.protocol            | d(omit) }}"
+    reject_with:         "{{ iptables_apply_item.reject_with         | d(omit) }}"
+    rule_num:            "{{ iptables_apply_item.rule_num            | d(omit) }}"
+    set_counters:        "{{ iptables_apply_item.set_counters        | d(omit) }}"
+    set_dscp_mark:       "{{ iptables_apply_item.set_dscp_mark       | d(omit) }}"
+    set_dscp_mark_class: "{{ iptables_apply_item.set_dscp_mark_class | d(omit) }}"
+    source:              "{{ iptables_apply_item.source              | d(omit) }}"
+    source_port:         "{{ iptables_apply_item.source_port         | d(omit) }}"
+    syn:                 "{{ iptables_apply_item.syn                 | d(omit) }}"
+    table:               "{{ iptables_apply_item.table               | d(omit) }}"
+    tcp_flags:           "{{ iptables_apply_item.tcp_flags           | d(omit) }}"
+    to_detination:       "{{ iptables_apply_item.to_destination      | d(omit) }}"
+    to_ports:            "{{ iptables_apply_item.to_ports            | d(omit) }}"
+    to_source:           "{{ iptables_apply_item.to_source           | d(omit) }}"
+    uid_owner:           "{{ iptables_apply_item.uid_owner           | d(omit) }}"
+    state:               "{{ iptables_apply_item.state               | d(omit) }}"
+  register: iptables_apply__ruleset
+  loop: "{{ iptables_apply__module_rules | d([]) }}"
+  loop_control:
+    loop_var: iptables_apply_item
+
+
+- import_tasks: iptables-persist.yml
+  when:
+    - iptables_apply__ruleset is changed
+    - iptables_apply__persist | bool
+
+
+- import_tasks: iptables-service.yml
