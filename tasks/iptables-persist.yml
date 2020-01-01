@@ -2,4 +2,4 @@
 - name: "confirm current ruleset as persistent"
   iptables_state:
     state: saved
-    dest: "{{ iptables_apply__service_ruleset }}"
+    path: "{{ iptables_apply__service_ruleset }}"

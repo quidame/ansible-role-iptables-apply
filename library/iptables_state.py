@@ -66,24 +66,23 @@ options:
         /proc/sys/kernel/modprobe is inspected to determine the executable's
         path.
     type: str
-  dest:
+  path:
     description:
       - The file the iptables state should be saved to.
-    type: path
-  src:
-    description:
       - The file the iptables state should be restored from.
+      - Required when I(state=saved) or I(state=restored).
     type: path
-  remote_src:
+  back:
     description:
-      - Whether the src is on the controller or on the host.
-    type: bool
-    default: no
-  content:
+      - The file the iptables state should be rolled back from.
+      - The file is removed in case of successfull rollback.
+    type: path
+  timeout:
     description:
-      - Instead of a file, iptables can be restored from a raw content (that
-        may also be templated).
-    type: str
+      - The time in seconds after what the rollback happens if new ruleset is
+        not confirmed (based on existence of the backup file).
+    type: int
+    default: 20
 '''
 
 EXAMPLES = r'''
@@ -98,12 +97,12 @@ EXAMPLES = r'''
 - name: Save current state of the firewall in system file
   iptables_state:
     state: saved
-    dest: /etc/sysconfig/iptables
+    path: /etc/sysconfig/iptables
 
 - name: Restore firewall state from a file
   iptables_state:
     state: restored
-    src: /run/iptables.new
+    path: /etc/sysconfig/iptables.alt
 
 
 # This sequence (3 tasks) implements a rollback in case of big mistake. Note
@@ -111,7 +110,7 @@ EXAMPLES = r'''
 - name: "1. apply ruleset and wait for confirmation"
   iptables_state:
     state: restored
-    src: /run/iptables.apply
+    path: /run/iptables.apply
     back: /run/iptables.saved
     timeout: "{{ iptables_state_timeout }}"
   async: "{{ iptables_state_timeout }}"
@@ -169,6 +168,9 @@ def reformat(string, boolean):
     return string_lines
 
 
+# Write given contents to the given file, and return the old and new checksums
+# of the file. The module currently doesn't manage parent directories (so, fail
+# if missing) nor the file properties (it does, but poorly with just os.umask).
 def writein(filepath, contents):
     b_filepath = to_bytes(filepath, errors='surrogate_or_strict')
     old = None
@@ -207,45 +209,42 @@ def writein(filepath, contents):
 def main():
     global module
     module = AnsibleModule(
-        supports_check_mode=True,
+        supports_check_mode=False,
         argument_spec=dict(
             ip_version=dict(type='str', default='ipv4', choices=['ipv4', 'ipv6']),
-            src=dict(type='path'),
-            dest=dict(type='path'),
+            path=dict(type='path'),
             back=dict(type='path'),
             state=dict(type='str', choices=['saved', 'restored']),
             table=dict(type='str', choices=['filter', 'nat', 'mangle', 'raw', 'security']),
+            timeout=dict(type='int', default=20),
             noflush=dict(type='bool', default=False),
             counters=dict(type='bool', default=False),
             modprobe=dict(type='path'),
-            timeout=dict(type='int', default=20),
         ),
-        required_if=[
-            ['state', 'saved', ['dest']],
-            ['state', 'restored', ['src']],
+        required_together=[
+            ['state', 'path'],
         ],
     )
 
     args = dict(
         ip_version = module.params['ip_version'],
-        src = module.params['src'],
-        dest = module.params['dest'],
+        path = module.params['path'],
         back = module.params['back'],
         state = module.params['state'],
         table = module.params['table'],
-        noflush = module.params['noflush'],
         timeout = module.params['timeout'],
-        modprobe = module.params['modprobe'],
+        noflush = module.params['noflush'],
         counters = module.params['counters'],
+        modprobe = module.params['modprobe'],
     )
 
 
     bin_iptables_save = module.get_bin_path(SAVE[args['ip_version']], True)
     bin_iptables_restore = module.get_bin_path(RESTORE[args['ip_version']], True)
 
+    os.umask(0o077)
     changed = False
     COMMANDARGS = []
-
 
     if args['counters']:
         COMMANDARGS.append('--counters')
@@ -264,28 +263,25 @@ def main():
     rc, stdout, stderr = module.run_command(INITCOMMAND, check_rc=True)
     initial_state = reformat(stdout, args['counters'])
 
-    if args['state'] is None:
-        cmd = ' '.join(INITCOMMAND)
-        module.exit_json(changed=changed, cmd=cmd, initial_state=initial_state)
-
     if args['state'] == 'saved':
-        cmd = ' '.join(INITCOMMAND)
-        checksum_old, checksum_new = writein(args['dest'], initial_state)
+        checksum_old, checksum_new = writein(args['path'], initial_state)
         if checksum_new != checksum_old:
             changed = True
-        module.exit_json(changed=changed, cmd=cmd, initial_state=initial_state)
 
+    if args['state'] != 'restored':
+        cmd = ' '.join(INITCOMMAND)
+        module.exit_json(changed=changed, cmd=cmd, initial_state=initial_state)
 
     #
     # All remaining code is for state=restored
     #
-    b_src = to_bytes(args['src'], errors='surrogate_or_strict')
-    if not os.path.exists(b_src):
-        module.fail_json(msg="Source %s not found" % (args['src']))
-    if not os.path.isfile(b_src):
-        module.fail_json(msg="Source %s not a file" % (args['src']))
-    if not os.access(b_src, os.R_OK):
-        module.fail_json(msg="Source %s not readable" % (args['src']))
+    b_path = to_bytes(args['path'], errors='surrogate_or_strict')
+    if not os.path.exists(b_path):
+        module.fail_json(msg="Source %s not found" % (args['path']))
+    if not os.path.isfile(b_path):
+        module.fail_json(msg="Source %s not a file" % (args['path']))
+    if not os.access(b_path, os.R_OK):
+        module.fail_json(msg="Source %s not readable" % (args['path']))
 
     MAINCOMMAND = list(COMMANDARGS)
     MAINCOMMAND.insert(0, bin_iptables_restore)
@@ -300,7 +296,7 @@ def main():
     if args['noflush']:
         MAINCOMMAND.append('--noflush')
 
-    MAINCOMMAND.append(args['src'])
+    MAINCOMMAND.append(args['path'])
     cmd = ' '.join(MAINCOMMAND)
 
     TESTCOMMAND = list(MAINCOMMAND)
@@ -308,7 +304,7 @@ def main():
 
     rc, stdout, stderr = module.run_command(TESTCOMMAND)
     if rc != 0:
-        module.fail_json(msg="Source %s is not suitable for input to %s" % (args['src'],
+        module.fail_json(msg="Source %s is not suitable for input to %s" % (args['path'],
             os.path.basename(bin_iptables_restore)), rc=rc, stdout=stdout, stderr=stderr)
 
     rc, stdout, stderr = module.run_command(MAINCOMMAND, check_rc=True)
@@ -321,7 +317,16 @@ def main():
         module.exit_json(changed=changed, cmd=cmd, initial_state=initial_state, restored_state=restored_state)
 
     # The poorly implemented rollback here (an action plugin, as for reboot,
-    # that even embeds the reset_connection, would be much better):
+    # that even embeds the reset_connection, would be much better). Remember
+    # that to make it working as expected, it needs:
+    # - 3 tasks
+    #   * call this module
+    #   * reset connection
+    #   * remove the backup
+    # - The first task must be called with
+    #   * async set to the same value (or higher) than the timeout module param
+    #   * poll=0
+    #
     for x in range(args['timeout']):
         if os.path.exists(args['back']):
             time.sleep(1)
@@ -334,7 +339,7 @@ def main():
 
     os.remove(args['back'])
 
-    module.fail_json(msg="Failed to confirm state restored from %s" % (args['src']))
+    module.fail_json(msg="Failed to confirm state restored from %s" % (args['path']))
 
 
 if __name__ == '__main__':
