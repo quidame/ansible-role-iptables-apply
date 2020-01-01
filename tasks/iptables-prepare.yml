@@ -10,14 +10,11 @@
 
   rescue:
     - name: "initialize firewall from NULL state"
-      command: iptables-restore
-      args:
-        stdin: |
-          *filter
-          :INPUT ACCEPT [0:0]
-          :OUTPUT ACCEPT [0:0]
-          :FORWARD ACCEPT [0:0]
-          COMMIT
-      changed_when: true
+      iptables:
+        chain: "{{ iptables_apply_item }}"
+        policy: ACCEPT
+      loop: ["INPUT", "OUTPUT", "FORWARD"]
+      loop_control:
+        loop_var: iptables_apply_item
 
     - import_tasks: iptables-init.yml
