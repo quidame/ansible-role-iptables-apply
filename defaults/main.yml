@@ -8,6 +8,7 @@
 # iptables_apply__action
 # iptables_apply__persist
 # iptables_apply__service
+# iptables_apply__service_ruleset
 # iptables_apply__service_enabled
 # iptables_apply__service_started
 # iptables_apply__path_backup
@@ -49,6 +50,16 @@ iptables_apply__persist: true
 # one is a plugin of the first).
 #
 iptables_apply__service: "{{ 'netfilter-persistent' if ansible_os_family == 'Debian' else 'iptables' }}"
+
+
+################################################################################
+# iptables_apply__service_ruleset
+#
+# The absolute path of the file where iptables state should be stored.
+#
+iptables_apply__service_ruleset: "{{
+  '/etc/iptables/rules.v4' if ansible_os_family == 'Debian' else
+  '/etc/sysconfig/iptables' }}"
 
 
 ################################################################################

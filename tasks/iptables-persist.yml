@@ -1,6 +1,5 @@
 ---
 - name: "confirm current ruleset as persistent"
-  command: "service {{ iptables_apply__service }} save"
-  changed_when: true
-  args:
-    warn: no
+  iptables_state:
+    state: saved
+    dest: "{{ iptables_apply__service_ruleset }}"
