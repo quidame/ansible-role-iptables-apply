@@ -1,15 +1,18 @@
 ---
-# No choice. We need a shell task to run in background. `async=1` and `poll=0`
-# are mandatory parameters to ensure ansible detaches itself from the script.
-# So the next task can be played DURING this one.
+# `async="{{ iptables_apply__timeout }}"` and `poll=0` are mandatory parameters
+# to ensure ansible detaches itself from the script and the script still runs in
+# background time enough.
 # Also, by using the temporary backup file as a cookie (absent/present), we can
-# either roll back or validate the rules and in the same time cleanup the file,
-# since attempts to remove it AFTER the failure may come too late.
+# either roll back or validate the rules and in the same time cleanup the file.
 - name: "1. apply iptables ruleset and wait for confirmation"
-  shell: "{{ lookup('template', 'iptables-apply.j2') }}"
-  async: 1
+  iptables_state:
+    state: restored
+    path: "{{ iptables_apply__path_buffer }}"
+    back: "{{ iptables_apply__path_backup }}"
+    noflush: "{{ iptables_apply__template_noflush if iptables_apply__action == 'template' else omit }}"
+    timeout: "{{ iptables_apply__timeout }}"
+  async: "{{ iptables_apply__timeout }}"
   poll: 0
-  changed_when: true
   when: iptables_apply__ruleset is changed
 
 
@@ -25,16 +28,12 @@
 # module is unusable here, since if a host is unreachable before the rollback,
 # the next task comes too late for all other hosts: rollbacks already happened
 # on all of them, whatever safe or not the applied ruleset was.
-- name: "2. confirm current ruleset and disable rollback by removing temporary cookies (backup and buffer)"
+- name: "2. confirm current ruleset and disable rollback by removing temporary backup"
   file:
-    path: "{{ iptables_apply_item }}"
+    path: "{{ iptables_apply__path_backup }}"
     state: absent
-  loop:
-    - "{{ iptables_apply__path_backup }}"
-    - "{{ iptables_apply__path_buffer }}"
-  loop_control:
-    loop_var: iptables_apply_item
   register: iptables_apply__confirm
   failed_when: iptables_apply__confirm is not changed
+  when: iptables_apply__ruleset is changed
   vars:
     ansible_timeout: "{{ iptables_apply__timeout|int * 2 }}"
