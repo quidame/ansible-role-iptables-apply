@@ -4,6 +4,17 @@
 # from scratch, open or close ports when installing or uninstalling a service.
 
 
+############################################################### GLOBAL VARIABLES
+# iptables_apply__action
+# iptables_apply__persist
+# iptables_apply__service
+# iptables_apply__service_enabled
+# iptables_apply__service_started
+# iptables_apply__path_backup
+# iptables_apply__path_buffer
+# iptables_apply__timeout
+
+
 ################################################################################
 # iptables_apply__action
 #
@@ -16,6 +27,75 @@
 #   also ensures the service is stopped and disabled.
 #
 iptables_apply__action: template
+
+
+################################################################################
+# iptables_apply__persist
+#
+# Whether or not to make the currently applied ruleset persistent across
+# reboots. Default is `true`.
+#
+iptables_apply__persist: true
+
+
+################################################################################
+# iptables_apply__service
+#
+# The name of the Systemd service that restores iptables ruleset at boot.
+# Default value depends on the distribution. You may want to override it in a
+# lot of cases. Also note that this role does not install anything, it just
+# applies rules in a safe way and ensures they will be applied after reboot.
+# On Debian, netfilter-persistent also needs iptables-persistent (the second
+# one is a plugin of the first).
+#
+iptables_apply__service: "{{ 'netfilter-persistent' if ansible_os_family == 'Debian' else 'iptables' }}"
+
+
+################################################################################
+# iptables_apply__service_enabled
+# iptables_apply__service_started
+#
+# These two variables define the state of the service at the end of the role
+# play. Default is `true` for each.
+#
+iptables_apply__service_enabled: true
+iptables_apply__service_started: true
+
+
+################################################################################
+# iptables_apply__path_backup
+# iptables_apply__path_buffer
+#
+# Temporary files to work with.
+# - the backup is for rolling back to the initial rules
+# - the buffer is for building a new ruleset from template or backup
+#
+iptables_apply__path_backup: /run/iptables.saved
+iptables_apply__path_buffer: /run/iptables.apply
+
+
+################################################################################
+# iptables_apply__timeout
+#
+# The delay, in seconds, after what the initial iptables ruleset is restored if
+# not disabled by the confirmation task.
+#
+iptables_apply__timeout: 20
+
+
+
+
+################################################### PER-ACTION RELATED VARIABLES
+# iptables_apply__rules (to append, insert, delete)
+# iptables_apply__template
+# iptables_apply__template_mark
+# iptables_apply__template_once
+# iptables_apply__template_core
+# iptables_apply__template_rules
+# iptables_apply__template_policy
+# iptables_apply__template_noflush
+# iptables_apply__flush
+# iptables_apply__flush_tables
 
 
 ################################################################################
@@ -52,19 +132,6 @@ iptables_apply__rules: []
 
 
 ################################################################################
-# iptables_apply__service
-#
-# The name of the Systemd service that restores iptables ruleset at boot.
-# Default value depends on the distribution. You may want to override it in a
-# lot of cases. Also note that this role does not install anything, it just
-# applies rules in a safe way and ensures they will be applied after reboot.
-# On Debian, netfilter-persistent also needs iptables-persistent (the second
-# one is a plugin of the first).
-#
-iptables_apply__service: "{{ 'netfilter-persistent' if ansible_os_family == 'Debian' else 'iptables' }}"
-
-
-################################################################################
 # iptables_apply__template
 #
 # Path of a template file that once evaluated is used as input for the command
@@ -74,6 +141,38 @@ iptables_apply__service: "{{ 'netfilter-persistent' if ansible_os_family == 'Deb
 # `flush` action).
 #
 iptables_apply__template: iptables_apply.j2
+
+
+################################################################################
+# iptables_apply__template_mark
+# iptables_apply__template_once
+#
+# 2 things:
+# 1. It is not possible to get idempotency by templating a temporary file;
+# 2. Rewriting an iptables ruleset from scratch leads to loose all rules that
+#    are not templated
+#
+# So, we use a marker, i.e. a string that we should find in the current rules
+# to know if the template has already been applied or not. It also means that
+# this string should not be found in the rules if they don't come from this
+# template.
+#
+# The first variable (mark) is the string to look for, to not blindly replay
+# the template. The second variable (once) is a boolean allowing one to force
+# the replay, when set to 'false' (defaults to 'true').
+#
+iptables_apply__template_mark: '-A INPUT -p tcp -m tcp ! --tcp-flags FIN,SYN,RST,ACK SYN -m comment --comment "bad NEWs" -j DROP'
+iptables_apply__template_once: true
+
+
+################################################################################
+# iptables_apply__template_core
+#
+# Whether or not to apply the core ruleset provided by the template. The core
+# rules, a.k.a. sanity rules, are inserted to ensure they will be evaluated
+# first even if `iptables_apply__template_noflush` is True. Defaults to `true`.
+#
+iptables_apply__template_core: true
 
 
 ################################################################################
@@ -87,9 +186,48 @@ iptables_apply__template_rules: "{{ iptables_apply__rules }}"
 
 
 ################################################################################
-# iptables_apply__timeout
+# iptables_apply__template_policy
 #
-# The delay, in seconds, after what the initial iptables ruleset is restored if
-# not disabled by the confirmation task.
+# The default policy to apply for each chain of the filter table. If a policy
+# is undefined in this variable, then it will not be changed on the target.
+# For example, to keep all current policies (that may by useful with
+# 'iptables_apply__template_noflush' set to 'True'):
+# iptables_apply__template_policy: {}
 #
-iptables_apply__timeout: 20
+iptables_apply__template_policy:
+  input: DROP
+  forward: DROP
+  output: ACCEPT
+
+
+################################################################################
+# iptables_apply__template_noflush
+#
+# If `True`, current iptables rules are not flushed, and so they'll still be
+# applied to packets not matching any rule from the template.  Default is
+# `false`.
+#
+# This variable will be silently ignored, when set to `true`, if the current
+# rules already contain the templated rules (at least a marker).
+#
+iptables_apply__template_noflush: false
+
+
+################################################################################
+# iptables_apply__flush
+#
+# The template to evaluate when `iptables_apply__action` is set to `flush`.
+# Defaults to `iptables_flush.j2`.
+#
+iptables_apply__flush: iptables_flush.j2
+
+
+################################################################################
+# iptables_apply__flush_tables
+#
+# When using `iptables_flush.j2` as the template to apply in place of the
+# default `iptables_apply.j2`, this variable defines the list of tables to
+# flush. Accepts a single keyword (a table name, or 'all'), or a list of these
+# keywords. Defaults to 'filter'.
+#
+iptables_apply__flush_tables: filter

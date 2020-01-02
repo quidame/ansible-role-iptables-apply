@@ -1,5 +1,11 @@
 # iptables_apply
 
+## [2.0.0]
+### Changed
+- Rename `iptables_apply__noflush` to `iptables_apply__template_noflush`
+- Move all role variables from `vars` to `defaults`
+- Update README accordingly
+
 ## [1.5.1] 2019-12-29
 ### Fixed
 - idempotency issue with quoted comments

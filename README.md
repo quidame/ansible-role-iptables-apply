@@ -193,12 +193,12 @@ iptables_apply__template_rules: "{{ iptables_apply__rules }}"
   the playbook nor its commandline call).
 
 ```yaml
-iptables_apply__noflush: false
+iptables_apply__template_noflush: false
 ```
 
 * Whether or not to apply the core ruleset provided by the template. The core
   rules, a.k.a. sanity rules, are inserted to ensure they will be evaluated
-  first even if `iptables_apply__noflush` is true.  Defaults to `true`.
+  first even if `iptables_apply__template_noflush` is true.  Defaults to `true`.
 
 ```yaml
 iptables_apply__template_core: true
@@ -206,8 +206,7 @@ iptables_apply__template_core: true
 
 * The default policy to apply for each chain of the filter table.  If a policy
   is undefined in this variable, then it will not be changed on the target. For
-  example, to keep all current policies (useful with `iptables_apply__noflush`
-  set to `True`): `iptables_apply__template_policy: {}`
+  example, to keep all current policies: `iptables_apply__template_policy: {}`
 
 ```yaml
 iptables_apply__template_policy:
@@ -267,7 +266,9 @@ Apply the core ruleset, ensuring a secure base setup with ssh access allowed
 and no more.
 
 ```yaml
+---
 - hosts: servers
+  become: yes
   roles:
     - role: iptables_apply
 ```
@@ -275,16 +276,20 @@ and no more.
 Apply the same ruleset on an already configured firewall you want to keep.
 
 ```yaml
+---
 - hosts: servers
+  become: yes
   roles:
     - role: iptables_apply
-      iptables_apply__noflush: yes
+      iptables_apply__template_noflush: yes
 ```
 
 Apply core ruleset and some passing rules for monitoring tools.
 
 ```yaml
+---
 - hosts: servers
+  become: yes
   roles:
     - role: iptables_apply
       iptables_apply__template_rules:
@@ -297,10 +302,12 @@ Apply core ruleset and some passing rules for monitoring tools.
           protocol: udp
 ```
 
-Add a single passing rule.  Replace `append` by `delete` to remove it.
+Add a single and simple passing rule. Replace `append` by `delete` to remove it.
 
 ```yaml
+---
 - hosts: dns-servers
+  become: yes
   roles:
     - role: iptables_apply
       iptables_apply__action: append
@@ -310,14 +317,70 @@ Add a single passing rule.  Replace `append` by `delete` to remove it.
           protocol: udp
 ```
 
+Do almost whatever you want, and bypass the rollback feature, by calling a
+tasks file that uses ansible's `iptables` module. The action of the role
+(`iptables_apply__action`) doesn't matter here, unless you explicitly map
+rule's `action` and `state` to it.
+
+```yaml
+---
+- hosts: db-servers
+  become: yes
+  tasks:
+    - include_role:
+        name: iptables_apply
+        tasks_from: iptables.yml
+  vars:
+    iptables_apply__module_rules:
+      - action: insert
+        chain: INPUT
+        protocol: tcp
+        source_port: "1024:"
+        destination_port: 5432
+        ctstate: NEW
+        syn: match
+        comment: "postgresql.service"
+        jump: ACCEPT
+        state: present
+```
+
 Do whatever you want with a custom template. It may as well include policies
 and rules for any table, not only the filter one.
 
 ```yaml
+---
 - hosts: routers
+  become: yes
   roles:
     - role: iptables_apply
       iptables_apply__template: iptables/routers.j2
+```
+
+Manage persistence of the current ruleset:
+
+```yaml
+---
+- hosts: all
+  become: yes
+  tasks:
+    - include_role:
+        name: iptables_apply
+        tasks_from: iptables-persist.yml
+```
+
+Or manage the service (for example disable it and keep it started):
+
+```yaml
+---
+- hosts: all
+  become: yes
+  tasks:
+    - include_role:
+        name: iptables_apply
+        tasks_from: iptables-service.yml
+      vars:
+        iptables_apply__service_enabled: false
+        iptables_apply__service_started: true
 ```
 
 You may also want to play this role from another one (here, say from `foobar`):
@@ -341,7 +404,7 @@ To make use of this role as a galaxy role, put the following lines in
 ```yaml
 - name: iptables_apply
   src: https://github.com/quidame/ansible-role-iptables_apply.git
-  version: 1.5.0
+  version: 2.0.0
   scm: git
 ```
 

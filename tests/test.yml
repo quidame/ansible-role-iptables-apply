@@ -760,7 +760,7 @@
       iptables_apply__action: append
       iptables_apply__rules: "{{ rules_web }}"
     - role: iptables_apply
-      iptables_apply__noflush: yes
+      iptables_apply__template_noflush: yes
 
   tasks:
     - name: "check the appended rule is still there"
