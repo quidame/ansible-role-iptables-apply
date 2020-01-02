@@ -39,7 +39,6 @@ options:
       - Whether the firewall state should be saved or restored.
     type: str
     choices: [ saved, restored ]
-    default: saved
   counters:
     description:
       - Save or restore the values of all packet and byte counters.
@@ -53,7 +52,7 @@ options:
         from a file flushes (deletes) all previous contents of the respective
         table.
     type: bool
-    default; false
+    default: false
   ip_version:
     description:
       - Which version of the IP protocol this module should apply to.
@@ -65,7 +64,7 @@ options:
       - Specify the path to the modprobe program. By default,
         /proc/sys/kernel/modprobe is inspected to determine the executable's
         path.
-    type: str
+    type: path
   path:
     description:
       - The file the iptables state should be saved to.
@@ -75,7 +74,8 @@ options:
   back:
     description:
       - The file the iptables state should be rolled back from.
-      - The file is removed in case of successfull rollback.
+      - The file is removed in case of successfull rollback and has to be
+        removed from another task to avoid this rollback.
     type: path
   timeout:
     description:
