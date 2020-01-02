@@ -838,10 +838,10 @@
     - timeout
 
   vars:
-    iptables_apply__timeout: "{{ lower_timeout | default(5) }}"
+    iptables_apply__rollback_timeout: "{{ lower_timeout | default(5) }}"
 
   tasks:
-    - name: "test rollback timeout (lower limit = {{ iptables_apply__timeout }})"
+    - name: "test rollback timeout (lower limit = {{ iptables_apply__rollback_timeout }})"
       block:
         - include_role:
             name: iptables_apply
@@ -861,7 +861,7 @@
         msg: "There is some unexpected issue in rollback feature"
       when: rollback_timeout_lower is undefined
 
-    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/19): ROLLBACK WITH LOWER TIMEOUT ({{ iptables_apply__timeout }}s)"
+    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/19): ROLLBACK WITH LOWER TIMEOUT ({{ iptables_apply__rollback_timeout }}s)"
       set_fact:
         number: "{{ number|int + 1 }}"
 
@@ -876,10 +876,10 @@
     - timeout
 
   vars:
-    iptables_apply__timeout: "{{ upper_timeout | default(300) }}"
+    iptables_apply__rollback_timeout: "{{ upper_timeout | default(300) }}"
 
   tasks:
-    - name: "test rollback timeout (upper limit = {{ iptables_apply__timeout }})"
+    - name: "test rollback timeout (upper limit = {{ iptables_apply__rollback_timeout }})"
       block:
         - include_role:
             name: iptables_apply
@@ -899,7 +899,7 @@
         msg: "There is some unexpected issue in rollback feature"
       when: rollback_timeout_upper is undefined
 
-    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/20): ROLLBACK WITH UPPER TIMEOUT ({{ iptables_apply__timeout }}s)"
+    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/20): ROLLBACK WITH UPPER TIMEOUT ({{ iptables_apply__rollback_timeout }}s)"
       set_fact:
         number: "{{ number|int + 1 }}"
 

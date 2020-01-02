@@ -123,7 +123,7 @@ iptables_apply__service: iptables
   is restored, if the applied one is not confirmed.
 
 ```yaml
-iptables_apply__timeout: 20
+iptables_apply__rollback_timeout: 20
 ```
 
 ### Advanced Variables

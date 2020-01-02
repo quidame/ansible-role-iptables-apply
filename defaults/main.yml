@@ -13,7 +13,7 @@
 # iptables_apply__service_started
 # iptables_apply__path_backup
 # iptables_apply__path_buffer
-# iptables_apply__timeout
+# iptables_apply__rollback_timeout
 
 
 ################################################################################
@@ -86,12 +86,12 @@ iptables_apply__path_buffer: /run/iptables.apply
 
 
 ################################################################################
-# iptables_apply__timeout
+# iptables_apply__rollback_timeout
 #
 # The delay, in seconds, after what the initial iptables ruleset is restored if
 # not disabled by the confirmation task.
 #
-iptables_apply__timeout: 20
+iptables_apply__rollback_timeout: 20
 
 
 

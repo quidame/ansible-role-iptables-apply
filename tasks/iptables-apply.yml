@@ -1,7 +1,7 @@
 ---
-# `async="{{ iptables_apply__timeout }}"` and `poll=0` are mandatory parameters
-# to ensure ansible detaches itself from the script and the script still runs in
-# background time enough.
+# `async="{{ iptables_apply__rollback_timeout }}"` and `poll=0` are mandatory
+# parameters to ensure ansible detaches itself from the script and the script
+# still runs in background time enough.
 # Also, by using the temporary backup file as a cookie (absent/present), we can
 # either roll back or validate the rules and in the same time cleanup the file.
 - name: "1. apply iptables ruleset and wait for confirmation"
@@ -10,8 +10,8 @@
     path: "{{ iptables_apply__path_buffer }}"
     back: "{{ iptables_apply__path_backup }}"
     noflush: "{{ iptables_apply__template_noflush if iptables_apply__action == 'template' else omit }}"
-    timeout: "{{ iptables_apply__timeout }}"
-  async: "{{ iptables_apply__timeout }}"
+    timeout: "{{ iptables_apply__rollback_timeout }}"
+  async: "{{ iptables_apply__rollback_timeout }}"
   poll: 0
   when: iptables_apply__ruleset is changed
 
@@ -36,4 +36,4 @@
   failed_when: iptables_apply__confirm is not changed
   when: iptables_apply__ruleset is changed
   vars:
-    ansible_timeout: "{{ iptables_apply__timeout|int * 2 }}"
+    ansible_timeout: "{{ iptables_apply__rollback_timeout|int * 2 }}"
