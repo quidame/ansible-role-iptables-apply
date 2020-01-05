@@ -987,3 +987,4 @@
           - "role = iptables_apply"
           - "tags = {{ ansible_run_tags | join(',') }}"
           - "skip-tags = {{ ansible_skip_tags | join(',') }}"
+          - "unplayed tests = {{ 21 - (number|int -1) }}"
