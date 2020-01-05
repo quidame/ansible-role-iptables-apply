@@ -16,16 +16,11 @@
   when: iptables_apply__ruleset is changed
 
 
-# This will ensure to not reuse a connected socket that could still be usable
-# only because of a passing rule for ESTABLISHED or RELATED states of packets.
-- meta: reset_connection
-
-
 # If the cookie doesn't exist, it means initial ruleset has been restored,
 # and it shouln't. If it exists, it means we have to remove it to avoid the
 # rollback.  Last but not least, the task that removes the cookie MUST be the
 # first task to attempt to connect to the target.  The `wait_for_connection`
-# module is unusable here, since if a host is unreachable before the rollback,
+# module is useless here, since if a host is unreachable before the rollback,
 # the next task comes too late for all other hosts: rollbacks already happened
 # on all of them, whatever safe or not the applied ruleset was.
 - name: "2. confirm current ruleset and disable rollback by removing temporary backup"

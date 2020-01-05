@@ -1,24 +1,15 @@
+# (c) 2020, quidame <quidame@poivron.org>
 # (c) 2012, Michael DeHaan <michael.dehaan@gmail.com>
-#
-# This file is part of Ansible
-#
-# Ansible is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# Ansible is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with Ansible.  If not, see <http://www.gnu.org/licenses/>.
+# GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
+
 from __future__ import (absolute_import, division, print_function)
 __metaclass__ = type
 
 from ansible.plugins.action import ActionBase
 from ansible.utils.vars import merge_hash
+from ansible.utils.display import Display
+
+display = Display()
 
 
 class ActionModule(ActionBase):
@@ -26,7 +17,7 @@ class ActionModule(ActionBase):
     def run(self, tmp=None, task_vars=None):
 
         # individual modules might disagree but as the generic the action plugin, pass at this point.
-        self._supports_check_mode = True
+        self._supports_check_mode = False
         self._supports_async = True
 
         result = super(ActionModule, self).run(tmp, task_vars)
@@ -45,10 +36,12 @@ class ActionModule(ActionBase):
             # do work!
             result = merge_hash(result, self._execute_module(task_vars=task_vars, wrap_async=wrap_async))
 
-            # hack to keep --verbose from showing all the setup module result
-            # moved from setup module as now we filter out all _ansible_ from result
-            if self._task.action == 'setup':
-                result['_ansible_verbose_override'] = True
+            if self._task.args.get('state', None) == 'restored':
+                try:
+                    self._connection.reset()
+                    display.v("%s: reset connection" % (self._task.action))
+                except AttributeError:
+                    pass
 
         if not wrap_async:
             # remove a temporary path we created
