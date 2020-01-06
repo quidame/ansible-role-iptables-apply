@@ -94,12 +94,21 @@ class ActionModule(ActionBase):
             # do work!
             result = merge_hash(result, self._execute_module(task_vars=task_vars, wrap_async=wrap_async))
 
-            if self._task.args.get('state', None) == 'restored':
+            if module_opts['state'] == 'restored':
                 try:
                     self._connection.reset()
-                    display.v("%s: reset connection" % (self._task.action))
+                    display.v("%s: reset connection" % (module_name))
                 except AttributeError:
                     display.warning("Connection plugin does not allow to reset the connection")
+
+                confirmation_command = 'rm %s' % module_opts['back']
+                for x in range(int(module_opts['timeout'])):
+                    time.sleep(1)
+                    try:
+                        confirmation = self._low_level_execute_command(confirmation_command, sudoable=self.DEFAULT_SUDOABLE)
+                        break
+                    except AnsibleConnectionFailure:
+                        continue
 
         if not wrap_async:
             # remove a temporary path we created
