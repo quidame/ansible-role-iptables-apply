@@ -19,7 +19,6 @@
 # Save current state of the firewall on the disk (file in /etc).
 - import_tasks: iptables-persist.yml
   when:
-    - iptables_apply__ruleset is changed
     - iptables_apply__persist | bool
 
 
