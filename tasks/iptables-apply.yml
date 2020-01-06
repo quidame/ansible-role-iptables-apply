@@ -2,9 +2,7 @@
 # `async="{{ iptables_apply__rollback_timeout }}"` and `poll=0` are mandatory
 # parameters to ensure ansible detaches itself from the script and the script
 # still runs in background time enough.
-# Also, by using the temporary backup file as a cookie (absent/present), we can
-# either roll back or validate the rules and in the same time cleanup the file.
-- name: "1. apply iptables ruleset and wait for confirmation"
+- name: "apply iptables ruleset and wait for confirmation"
   iptables_state:
     state: restored
     path: "{{ iptables_apply__path_buffer }}"
@@ -13,22 +11,4 @@
     timeout: "{{ iptables_apply__rollback_timeout }}"
   async: "{{ iptables_apply__rollback_timeout }}"
   poll: 0
-  when: iptables_apply__ruleset is changed
-
-
-# If the cookie doesn't exist, it means initial ruleset has been restored,
-# and it shouln't. If it exists, it means we have to remove it to avoid the
-# rollback.  Last but not least, the task that removes the cookie MUST be the
-# first task to attempt to connect to the target.  The `wait_for_connection`
-# module is useless here, since if a host is unreachable before the rollback,
-# the next task comes too late for all other hosts: rollbacks already happened
-# on all of them, whatever safe or not the applied ruleset was.
-- name: "2. confirm current ruleset and disable rollback by removing temporary backup"
-  file:
-    path: "{{ iptables_apply__path_backup }}"
-    state: absent
-  register: iptables_apply__confirm
-  failed_when: iptables_apply__confirm is not changed
-  when: iptables_apply__ruleset is changed
-  vars:
-    ansible_timeout: "{{ iptables_apply__rollback_timeout|int * 2 }}"
+  register: iptables_apply__restored
