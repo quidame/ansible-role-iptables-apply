@@ -5,14 +5,30 @@
 from __future__ import (absolute_import, division, print_function)
 __metaclass__ = type
 
+import time
+
 from ansible.plugins.action import ActionBase
 from ansible.utils.vars import merge_hash
 from ansible.utils.display import Display
+from ansible.errors import AnsibleError, AnsibleActionFail, AnsibleConnectionFailure
 
 display = Display()
 
 
 class ActionModule(ActionBase):
+
+    # Default values of the module params:
+    DEFAULT_PATH = None
+    DEFAULT_BACK = None
+    DEFAULT_STATE = None
+    DEFAULT_TABLE = None
+    DEFAULT_TIMEOUT = 20
+    DEFAULT_NOFLUSH = False
+    DEFAULT_COUNTERS = False
+    DEFAULT_MODPROBE = None
+    DEFAULT_IP_VERSION = 'ipv4'
+
+    DEFAULT_SUDOABLE = True
 
     def run(self, tmp=None, task_vars=None):
 
@@ -22,6 +38,23 @@ class ActionModule(ActionBase):
 
         result = super(ActionModule, self).run(tmp, task_vars)
         del tmp  # tmp no longer has any effect
+
+        task_async = self._task.async_val
+        task_poll = self._task.poll
+        module_name = self._task.action
+        module_args = self._task.args
+        module_opts = dict(
+                path = module_args.get('path', self.DEFAULT_PATH),
+                back = module_args.get('back', self.DEFAULT_BACK),
+                state = module_args.get('state', self.DEFAULT_STATE),
+                table = module_args.get('table', self.DEFAULT_TABLE),
+                timeout = module_args.get('timeout', self.DEFAULT_TIMEOUT),
+                noflush = module_args.get('noflush', self.DEFAULT_NOFLUSH),
+                counters = module_args.get('counters', self.DEFAULT_COUNTERS),
+                modprobe = module_args.get('modprobe', self.DEFAULT_MODPROBE),
+                ip_version = module_args.get('ip_version', self.DEFAULT_IP_VERSION),
+        )
+
 
         if not result.get('skipped'):
 
