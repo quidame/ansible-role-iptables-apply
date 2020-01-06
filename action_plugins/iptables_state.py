@@ -30,6 +30,22 @@ class ActionModule(ActionBase):
 
     DEFAULT_SUDOABLE = True
 
+    # I'm unable to override async_val AND poll values from here. So... just
+    # fail if they don't match the required values.
+    def _async_is_needed(self, module_name, module_timeout, task_async, task_poll, task_vars):
+        msg = ('Task attribute \'async\' (= %s) MUST be set to a value greater than or equal to '
+               '\'timeout\' module parameter (currently %s), and attribute \'poll\' (= %s) MUST '
+               'be set to 0, to enable rollback feature. This is also the case for the more global '
+               '\'ansible_timeout\' (= %s), which has to be greater or equal to the module param.'
+               % (task_async, module_timeout, task_poll, task_vars['ansible_timeout']))
+
+        if task_async < module_timeout or task_poll != 0:
+            raise AnsibleActionFail(msg)
+        else:
+            display.v("%s: run in background until completed or for max %s seconds." % (module_name, module_timeout))
+            return True
+
+
     def run(self, tmp=None, task_vars=None):
 
         # individual modules might disagree but as the generic the action plugin, pass at this point.
@@ -65,6 +81,15 @@ class ActionModule(ActionBase):
 
             # FUTURE: better to let _execute_module calculate this internally?
             wrap_async = self._task.async_val and not self._connection.has_native_async
+
+            if module_opts['state'] == 'restored':
+                #task_vars.update(dict(ansible_timeout=module_opts['timeout']))
+                self._async_is_needed(
+                        module_name,
+                        int(module_opts['timeout']),
+                        int(task_async),
+                        int(task_poll),
+                        task_vars)
 
             # do work!
             result = merge_hash(result, self._execute_module(task_vars=task_vars, wrap_async=wrap_async))
