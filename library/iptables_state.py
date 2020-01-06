@@ -102,39 +102,22 @@ EXAMPLES = r'''
 - name: Restore firewall state from a file
   iptables_state:
     state: restored
-    path: /etc/sysconfig/iptables.alt
-
-
-# This sequence (3 tasks) implements a rollback in case of big mistake. Note
-# that the `async` value MUST be greater or equal to the `timeout` parameter.
-- name: "1. apply ruleset and wait for confirmation"
-  iptables_state:
-    state: restored
     path: /run/iptables.apply
     back: /run/iptables.saved
-    timeout: "{{ iptables_state_timeout }}"
-  async: "{{ iptables_state_timeout }}"
+    timeout: "{{ ansible_timeout }}"
+  async: "{{ ansible_timeout }}"
   poll: 0
-
-- meta: reset_connection
-
-- name: "2. confirm applied ruleset to avoid rollback"
-  file:
-    path: /run/iptables.saved
-    state: absent
-  register: confirm
-  failed_when: confirm is not changed
 '''
 
 RETURN = r'''
 initial_state:
     description: the current state of the firewall when module starts
     type: list
-    returned: success
+    returned: always
 restored_state:
     description: the new state of the firewall, when state=restored
     type: list
-    returned: success
+    returned: always
 '''
 
 
@@ -314,32 +297,56 @@ def main():
         changed = True
 
     if args['back'] is None:
-        module.exit_json(changed=changed, cmd=cmd, initial_state=initial_state, restored_state=restored_state)
+        module.exit_json(
+                applied=True,
+                changed=changed,
+                cmd=cmd,
+                initial_state=initial_state,
+                restored_state=restored_state)
 
-    # The poorly implemented rollback here (an action plugin, as for reboot,
-    # that even embeds the reset_connection, would be much better). Remember
-    # that to make it working as expected, it needs:
-    # - 3 tasks
-    #   * call this module
-    #   * reset connection
-    #   * remove the backup
-    # - The first task must be called with
-    #   * async set to the same value (or higher) than the timeout module param
-    #   * poll=0
+
+    # The rollback implementation currently needs:
+    # Here:
+    # * test existence of the backup file, exit with success if it doesn't exist
+    # * otherwise, restore iptables from this file and return failure
+    # Action plugin:
+    # * try to remove the backup file
+    # * wait async task is finished and retrieve its final status
+    # * modify it and return the result
+    # Task:
+    # * ansible_timeout set to the same value (or higher) than the timeout
+    #   module param
+    # * task attribute 'async' set to the same value (or higher) than the
+    #   timeout module param
+    # * task attribute 'poll' equals 0
     #
     for x in range(args['timeout']):
         if os.path.exists(args['back']):
             time.sleep(1)
             continue
-        module.exit_json(changed=changed, cmd=cmd, initial_state=initial_state, restored_state=restored_state)
+        module.exit_json(
+                applied=True,
+                changed=changed,
+                cmd=cmd,
+                initial_state=initial_state,
+                restored_state=restored_state)
 
+    # Here we are: for whatever reason, but probably due to the current ruleset,
+    # the action plugin (i.e. on the controller) was unable to remove the backup
+    # cookie, so we restore initial state from it.
     rc, stdout, stderr = module.run_command(BACKCOMMAND, check_rc=True)
     rc, stdout, stderr = module.run_command(INITCOMMAND, check_rc=True)
     backed_state = reformat(stdout, args['counters'])
 
     os.remove(args['back'])
 
-    module.fail_json(msg="Failed to confirm state restored from %s" % (args['path']))
+    module.fail_json(
+            rollback_complete=(backed_state == initial_state),
+            applied=False,
+            cmd=cmd,
+            msg="Failed to confirm state restored from %s. Firewall has been rolled back to initial state" % (args['path']),
+            initial_state=initial_state,
+            restored_state=restored_state)
 
 
 if __name__ == '__main__':
