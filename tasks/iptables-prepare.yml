@@ -13,7 +13,7 @@
       iptables:
         chain: "{{ iptables_apply_item }}"
         policy: ACCEPT
-      loop: ["INPUT", "OUTPUT", "FORWARD"]
+      loop: ["INPUT", "FORWARD", "OUTPUT"]
       loop_control:
         loop_var: iptables_apply_item
 
