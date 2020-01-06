@@ -41,7 +41,7 @@ class ActionModule(ActionBase):
                     self._connection.reset()
                     display.v("%s: reset connection" % (self._task.action))
                 except AttributeError:
-                    pass
+                    display.warning("Connection plugin does not allow to reset the connection")
 
         if not wrap_async:
             # remove a temporary path we created
