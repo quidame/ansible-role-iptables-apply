@@ -106,7 +106,6 @@ class ActionModule(ActionBase):
             wrap_async = self._task.async_val and not self._connection.has_native_async
 
             if module_opts['state'] == 'restored':
-                #task_vars.update(dict(ansible_timeout=module_opts['timeout']))
                 self._async_is_needed(
                         module_name,
                         int(module_opts['timeout']),
