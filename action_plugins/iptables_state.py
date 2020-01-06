@@ -46,6 +46,29 @@ class ActionModule(ActionBase):
             return True
 
 
+    # Retrieve results of the asynchonous task, and display them in place of
+    # the async wrapper results (those with the ansible_job_id key).
+    def _async_result(self, module_name, module_args, task_vars):
+        async_result = {}
+        async_result['finished'] = 0
+
+        while async_result['finished'] == 0:
+            async_result = self._execute_module(
+                    module_name=module_name,
+                    module_args=module_args,
+                    task_vars=task_vars,
+                    wrap_async=False)
+
+        del async_result['ansible_job_id']
+        del async_result['finished']
+
+        if async_result['restored_state'] is not None:
+            if async_result['restored_state'] == async_result['initial_state']:
+                async_result['changed'] = False
+
+        return async_result
+
+
     def run(self, tmp=None, task_vars=None):
 
         # individual modules might disagree but as the generic the action plugin, pass at this point.
@@ -94,6 +117,10 @@ class ActionModule(ActionBase):
             # do work!
             result = merge_hash(result, self._execute_module(task_vars=task_vars, wrap_async=wrap_async))
 
+            # Then the 3-steps "go ahead or rollback":
+            # - reset connection to ensure a persistent one will not be reused
+            # - confirm the restored state by removing the backup/cookie
+            # - retrieve results of the asynchronous task to return them
             if module_opts['state'] == 'restored':
                 try:
                     self._connection.reset()
@@ -109,6 +136,18 @@ class ActionModule(ActionBase):
                         break
                     except AnsibleConnectionFailure:
                         continue
+
+
+                async_module_args = {}
+                async_module_args['jid'] = result['ansible_job_id']
+                result = self._async_result('async_status', async_module_args, task_vars)
+
+                async_module_args['mode'] = 'cleanup'
+                garbage = self._execute_module(
+                        module_name='async_status',
+                        module_args=async_module_args,
+                        task_vars=task_vars,
+                        wrap_async=False)
 
         if not wrap_async:
             # remove a temporary path we created
