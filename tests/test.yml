@@ -233,7 +233,7 @@
     - name: "idempotency failure"
       fail:
         msg: "There is some lack of idempotency in 'template'"
-      when: iptables_apply__ruleset is changed
+      failed_when: iptables_apply__ruleset is changed
 
     - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/04): IDEMPOTENCY OF ACTION 'TEMPLATE'"
       set_fact:
@@ -258,7 +258,7 @@
     - name: "force-overwrite failure"
       fail:
         msg: "There is some lack of *force overwrite* in 'template'"
-      when: iptables_apply__ruleset is not changed
+      failed_when: iptables_apply__ruleset is not changed
 
     - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/05): OVERWRITE OF ACTION 'TEMPLATE'"
       set_fact:
@@ -288,13 +288,14 @@
           assert:
             that:
               - iptables_apply__ruleset is changed
-              - iptables_apply__confirm is not changed
+              - iptables_apply__restored.applied is defined
+              - not iptables_apply__restored.applied
           register: rollback_template
 
     - name: "fail if role succeeded"
       fail:
         msg: "There is some unexpected issue in rollback feature"
-      when: rollback_template is undefined
+      failed_when: rollback_template is undefined
 
     - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/06): ROLLBACK FOR ACTION 'TEMPLATE'"
       set_fact:
@@ -419,7 +420,7 @@
     - name: "idempotency failure"
       fail:
         msg: "There is some lack of idempotency in 'append'"
-      when: iptables_apply__ruleset is changed
+      failed_when: iptables_apply__ruleset is changed
 
     - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/09): IDEMPOTENCY OF ACTION 'APPEND'"
       set_fact:
@@ -456,13 +457,14 @@
           assert:
             that:
               - iptables_apply__ruleset is changed
-              - iptables_apply__confirm is not changed
+              - iptables_apply__restored.applied is defined
+              - not iptables_apply__restored.applied
           register: rollback_append
 
     - name: "fail if role succeeded"
       fail:
         msg: "There is some unexpected issue in rollback feature"
-      when: rollback_append is undefined
+      failed_when: rollback_append is undefined
 
     - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/10): ROLLBACK FOR ACTION 'APPEND'"
       set_fact:
@@ -561,7 +563,7 @@
     - name: "idempotency failure"
       fail:
         msg: "There is some lack of idempotency in 'insert'"
-      when: iptables_apply__ruleset is changed
+      failed_when: iptables_apply__ruleset is changed
 
     - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/12): IDEMPOTENCY OF ACTION 'INSERT'"
       set_fact:
@@ -594,13 +596,14 @@
           assert:
             that:
               - iptables_apply__ruleset is changed
-              - iptables_apply__confirm is not changed
+              - iptables_apply__restored.applied is defined
+              - not iptables_apply__restored.applied
           register: rollback_insert
 
     - name: "fail if role succeeded"
       fail:
         msg: "There is some unexpected issue in rollback feature"
-      when: rollback_insert is undefined
+      failed_when: rollback_insert is undefined
 
     - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/13): ROLLBACK FOR ACTION 'INSERT'"
       set_fact:
@@ -699,7 +702,7 @@
     - name: "idempotency failure"
       fail:
         msg: "There is some lack of idempotency in 'delete'"
-      when: iptables_apply__ruleset is changed
+      failed_when: iptables_apply__ruleset is changed
 
     - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/15): IDEMPOTENCY OF ACTION 'DELETE'"
       set_fact:
@@ -735,13 +738,14 @@
           assert:
             that:
               - iptables_apply__ruleset is changed
-              - iptables_apply__confirm is not changed
+              - iptables_apply__restored.applied is defined
+              - not iptables_apply__restored.applied
           register: rollback_delete
 
     - name: "fail if role succeeded"
       fail:
         msg: "There is some unexpected issue in rollback feature"
-      when: rollback_delete is undefined
+      failed_when: rollback_delete is undefined
 
     - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/16): ROLLBACK FOR ACTION 'DELETE'"
       set_fact:
@@ -815,13 +819,14 @@
           assert:
             that:
               - iptables_apply__ruleset is changed
-              - iptables_apply__confirm is not changed
+              - iptables_apply__restored.applied is defined
+              - not iptables_apply__restored.applied
           register: rollback_policy
 
     - name: "fail if role succeeded"
       fail:
         msg: "There is some unexpected issue in rollback feature"
-      when: rollback_policy is undefined
+      failed_when: rollback_policy is undefined
 
     - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/18): ROLLBACK WITH A BAD POLICY"
       set_fact:
@@ -836,9 +841,11 @@
   tags:
     - rollback
     - timeout
+    - lower
 
   vars:
-    iptables_apply__rollback_timeout: "{{ lower_timeout | default(5) }}"
+    ansible_timeout: "{{ lower_timeout | default(5) }}"
+    iptables_apply__rollback_timeout: "{{ ansible_timeout }}"
 
   tasks:
     - name: "test rollback timeout (lower limit = {{ iptables_apply__rollback_timeout }})"
@@ -853,13 +860,14 @@
           assert:
             that:
               - iptables_apply__ruleset is changed
-              - iptables_apply__confirm is not changed
+              - iptables_apply__restored.applied is defined
+              - not iptables_apply__restored.applied
           register: rollback_timeout_lower
 
     - name: "fail if role succeeded"
       fail:
         msg: "There is some unexpected issue in rollback feature"
-      when: rollback_timeout_lower is undefined
+      failed_when: rollback_timeout_lower is undefined
 
     - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/19): ROLLBACK WITH LOWER TIMEOUT ({{ iptables_apply__rollback_timeout }}s)"
       set_fact:
@@ -874,9 +882,11 @@
   tags:
     - rollback
     - timeout
+    - upper
 
   vars:
-    iptables_apply__rollback_timeout: "{{ upper_timeout | default(300) }}"
+    ansible_timeout: "{{ upper_timeout | default(300) }}"
+    iptables_apply__rollback_timeout: "{{ ansible_timeout }}"
 
   tasks:
     - name: "test rollback timeout (upper limit = {{ iptables_apply__rollback_timeout }})"
@@ -891,13 +901,14 @@
           assert:
             that:
               - iptables_apply__ruleset is changed
-              - iptables_apply__confirm is not changed
+              - iptables_apply__restored.applied is defined
+              - not iptables_apply__restored.applied
           register: rollback_timeout_upper
 
     - name: "fail if role succeeded"
       fail:
         msg: "There is some unexpected issue in rollback feature"
-      when: rollback_timeout_upper is undefined
+      failed_when: rollback_timeout_upper is undefined
 
     - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/20): ROLLBACK WITH UPPER TIMEOUT ({{ iptables_apply__rollback_timeout }}s)"
       set_fact:
@@ -978,6 +989,7 @@
 ################################################################################
 - name: "CONGRATULATIONS"
   hosts: tests
+  gather_facts: no
   tags: always
   tasks:
     - name: "results overview"
