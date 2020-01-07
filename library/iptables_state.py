@@ -110,6 +110,10 @@ EXAMPLES = r'''
 '''
 
 RETURN = r'''
+applied:
+    description: whether or not the wanted state has been successfully applied
+    type: bool
+    returned: always
 initial_state:
     description: the current state of the firewall when module starts
     type: list
@@ -118,6 +122,10 @@ restored_state:
     description: the new state of the firewall, when state=restored
     type: list
     returned: always
+rollback_complete:
+    description: whether or not firewall state is the same than the initial one
+    type: bool
+    returned: failure
 '''
 
 
@@ -209,77 +217,75 @@ def main():
         ],
     )
 
-    args = dict(
-        ip_version = module.params['ip_version'],
-        path = module.params['path'],
-        back = module.params['back'],
-        state = module.params['state'],
-        table = module.params['table'],
-        timeout = module.params['timeout'],
-        noflush = module.params['noflush'],
-        counters = module.params['counters'],
-        modprobe = module.params['modprobe'],
-    )
+    path = module.params['path']
+    back = module.params['back']
+    state = module.params['state']
+    table = module.params['table']
+    timeout = module.params['timeout']
+    noflush = module.params['noflush']
+    counters = module.params['counters']
+    modprobe = module.params['modprobe']
+    ip_version = module.params['ip_version']
 
 
-    bin_iptables_save = module.get_bin_path(SAVE[args['ip_version']], True)
-    bin_iptables_restore = module.get_bin_path(RESTORE[args['ip_version']], True)
+    bin_iptables_save = module.get_bin_path(SAVE[ip_version], True)
+    bin_iptables_restore = module.get_bin_path(RESTORE[ip_version], True)
 
     os.umask(0o077)
     changed = False
     COMMANDARGS = []
 
-    if args['counters']:
+    if counters:
         COMMANDARGS.append('--counters')
 
-    if args['modprobe'] is not None:
+    if modprobe is not None:
         COMMANDARGS.append('--modprobe')
-        COMMANDARGS.append(args['modprobe'])
+        COMMANDARGS.append(modprobe)
 
-    if args['table'] is not None:
+    if table is not None:
         COMMANDARGS.append('--table')
-        COMMANDARGS.append(args['table'])
+        COMMANDARGS.append(table)
 
     INITCOMMAND = list(COMMANDARGS)
     INITCOMMAND.insert(0, bin_iptables_save)
 
     rc, stdout, stderr = module.run_command(INITCOMMAND, check_rc=True)
-    initial_state = reformat(stdout, args['counters'])
+    initial_state = reformat(stdout, counters)
 
-    if args['state'] == 'saved':
-        checksum_old, checksum_new = writein(args['path'], initial_state)
+    if state == 'saved':
+        checksum_old, checksum_new = writein(path, initial_state)
         if checksum_new != checksum_old:
             changed = True
 
-    if args['state'] != 'restored':
+    if state != 'restored':
         cmd = ' '.join(INITCOMMAND)
         module.exit_json(changed=changed, cmd=cmd, initial_state=initial_state)
 
     #
     # All remaining code is for state=restored
     #
-    b_path = to_bytes(args['path'], errors='surrogate_or_strict')
+    b_path = to_bytes(path, errors='surrogate_or_strict')
     if not os.path.exists(b_path):
-        module.fail_json(msg="Source %s not found" % (args['path']))
+        module.fail_json(msg="Source %s not found" % (path))
     if not os.path.isfile(b_path):
-        module.fail_json(msg="Source %s not a file" % (args['path']))
+        module.fail_json(msg="Source %s not a file" % (path))
     if not os.access(b_path, os.R_OK):
-        module.fail_json(msg="Source %s not readable" % (args['path']))
+        module.fail_json(msg="Source %s not readable" % (path))
 
     MAINCOMMAND = list(COMMANDARGS)
     MAINCOMMAND.insert(0, bin_iptables_restore)
 
-    if args['back'] is not None:
-        checksum_old, checksum_new = writein(args['back'], initial_state)
+    if back is not None:
+        checksum_old, checksum_new = writein(back, initial_state)
         if checksum_new != checksum_old:
             changed = True
         BACKCOMMAND = list(MAINCOMMAND)
-        BACKCOMMAND.append(args['back'])
+        BACKCOMMAND.append(back)
 
-    if args['noflush']:
+    if noflush:
         MAINCOMMAND.append('--noflush')
 
-    MAINCOMMAND.append(args['path'])
+    MAINCOMMAND.append(path)
     cmd = ' '.join(MAINCOMMAND)
 
     TESTCOMMAND = list(MAINCOMMAND)
@@ -287,16 +293,16 @@ def main():
 
     rc, stdout, stderr = module.run_command(TESTCOMMAND)
     if rc != 0:
-        module.fail_json(msg="Source %s is not suitable for input to %s" % (args['path'],
+        module.fail_json(msg="Source %s is not suitable for input to %s" % (path,
             os.path.basename(bin_iptables_restore)), rc=rc, stdout=stdout, stderr=stderr)
 
     rc, stdout, stderr = module.run_command(MAINCOMMAND, check_rc=True)
     rc, stdout, stderr = module.run_command(INITCOMMAND, check_rc=True)
-    restored_state = reformat(stdout, args['counters'])
+    restored_state = reformat(stdout, counters)
     if restored_state != initial_state:
         changed = True
 
-    if args['back'] is None:
+    if back is None:
         module.exit_json(
                 applied=True,
                 changed=changed,
@@ -320,8 +326,8 @@ def main():
     #   timeout module param
     # * task attribute 'poll' equals 0
     #
-    for x in range(args['timeout']):
-        if os.path.exists(args['back']):
+    for x in range(timeout):
+        if os.path.exists(back):
             time.sleep(1)
             continue
         module.exit_json(
@@ -336,15 +342,15 @@ def main():
     # cookie, so we restore initial state from it.
     rc, stdout, stderr = module.run_command(BACKCOMMAND, check_rc=True)
     rc, stdout, stderr = module.run_command(INITCOMMAND, check_rc=True)
-    backed_state = reformat(stdout, args['counters'])
+    backed_state = reformat(stdout, counters)
 
-    os.remove(args['back'])
+    os.remove(back)
 
     module.fail_json(
             rollback_complete=(backed_state == initial_state),
             applied=False,
             cmd=cmd,
-            msg="Failed to confirm state restored from %s. Firewall has been rolled back to initial state" % (args['path']),
+            msg="Failed to confirm state restored from %s. Firewall has been rolled back to initial state" % (path),
             initial_state=initial_state,
             restored_state=restored_state)
 

@@ -17,17 +17,6 @@ display = Display()
 
 class ActionModule(ActionBase):
 
-    # Default values of the module params:
-    DEFAULT_PATH = None
-    DEFAULT_BACK = None
-    DEFAULT_STATE = None
-    DEFAULT_TABLE = None
-    DEFAULT_TIMEOUT = 20
-    DEFAULT_NOFLUSH = False
-    DEFAULT_COUNTERS = False
-    DEFAULT_MODPROBE = None
-    DEFAULT_IP_VERSION = 'ipv4'
-
     DEFAULT_SUDOABLE = True
 
     # I'm unable to override async_val AND poll values from here. So... just
@@ -77,17 +66,6 @@ class ActionModule(ActionBase):
         task_poll = self._task.poll
         module_name = self._task.action
         module_args = self._task.args
-        module_opts = dict(
-                path = module_args.get('path', self.DEFAULT_PATH),
-                back = module_args.get('back', self.DEFAULT_BACK),
-                state = module_args.get('state', self.DEFAULT_STATE),
-                table = module_args.get('table', self.DEFAULT_TABLE),
-                timeout = module_args.get('timeout', self.DEFAULT_TIMEOUT),
-                noflush = module_args.get('noflush', self.DEFAULT_NOFLUSH),
-                counters = module_args.get('counters', self.DEFAULT_COUNTERS),
-                modprobe = module_args.get('modprobe', self.DEFAULT_MODPROBE),
-                ip_version = module_args.get('ip_version', self.DEFAULT_IP_VERSION),
-        )
 
 
         if not result.get('skipped'):
@@ -100,10 +78,10 @@ class ActionModule(ActionBase):
             # FUTURE: better to let _execute_module calculate this internally?
             wrap_async = self._task.async_val and not self._connection.has_native_async
 
-            if module_opts['state'] == 'restored':
+            if module_args['state'] == 'restored':
                 self._async_is_needed(
                         module_name,
-                        int(module_opts['timeout']),
+                        int(module_args['timeout']),
                         int(task_async),
                         int(task_poll),
                         task_vars)
@@ -115,15 +93,15 @@ class ActionModule(ActionBase):
             # - reset connection to ensure a persistent one will not be reused
             # - confirm the restored state by removing the backup/cookie
             # - retrieve results of the asynchronous task to return them
-            if module_opts['state'] == 'restored':
+            if module_args['state'] == 'restored':
                 try:
                     self._connection.reset()
                     display.v("%s: reset connection" % (module_name))
                 except AttributeError:
                     display.warning("Connection plugin does not allow to reset the connection")
 
-                confirmation_command = 'rm %s' % module_opts['back']
-                for x in range(int(module_opts['timeout'])):
+                confirmation_command = 'rm %s' % module_args['back']
+                for x in range(int(module_args['timeout'])):
                     time.sleep(1)
                     try:
                         confirmation = self._low_level_execute_command(confirmation_command, sudoable=self.DEFAULT_SUDOABLE)
