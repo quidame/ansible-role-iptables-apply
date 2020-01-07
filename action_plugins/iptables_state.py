@@ -17,6 +17,16 @@ display = Display()
 
 class ActionModule(ActionBase):
 
+    DEFAULT_PATH = None
+    DEFAULT_BACK = None
+    DEFAULT_STATE = None
+    DEFAULT_TABLE = None
+    DEFAULT_TIMEOUT = None
+    DEFAULT_NOFLUSH = False
+    DEFAULT_COUNTERS = False
+    DEFAULT_MODPROBE = None
+    DEFAULT_IP_VERSION = 'ipv4'
+
     DEFAULT_SUDOABLE = True
 
     # I'm unable to override async_val AND poll values from here. So... just
@@ -65,7 +75,17 @@ class ActionModule(ActionBase):
         task_async = self._task.async_val
         task_poll = self._task.poll
         module_name = self._task.action
-        module_args = self._task.args
+        module_args = dict(
+                path = self._task.args.get('path', self.DEFAULT_PATH),
+                back = self._task.args.get('back', self.DEFAULT_BACK),
+                state = self._task.args.get('state', self.DEFAULT_STATE),
+                table = self._task.args.get('table', self.DEFAULT_TABLE),
+                timeout = self._task.args.get('timeout', self.DEFAULT_TIMEOUT),
+                noflush = self._task.args.get('noflush', self.DEFAULT_NOFLUSH),
+                counters = self._task.args.get('counters', self.DEFAULT_COUNTERS),
+                modprobe = self._task.args.get('modprobe', self.DEFAULT_MODPROBE),
+                ip_version = self._task.args.get('ip_version', self.DEFAULT_IP_VERSION),
+        )
 
 
         if not result.get('skipped'):
