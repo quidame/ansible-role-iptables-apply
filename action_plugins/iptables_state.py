@@ -110,8 +110,8 @@ class ActionModule(ActionBase):
                         continue
 
 
-                async_module_args = {}
-                async_module_args['jid'] = result['ansible_job_id']
+                async_status_args = {}
+                async_status_args['jid'] = result['ansible_job_id']
 
                 ### Begin Ansible 2.7 -> 2.8 compatibility stuff {{{
                 set_async_dir = True
@@ -127,15 +127,15 @@ class ActionModule(ActionBase):
                     else:
                         async_dir = opt_async_dir
 
-                    async_module_args['_async_dir'] = async_dir
+                    async_status_args['_async_dir'] = async_dir
                 ##### End Ansible 2.7 -> 2.8 compatibility stuff }}}
 
-                result = self._async_result('async_status', async_module_args, task_vars)
+                result = self._async_result('async_status', async_status_args, task_vars)
 
-                async_module_args['mode'] = 'cleanup'
+                async_status_args['mode'] = 'cleanup'
                 garbage = self._execute_module(
                         module_name='async_status',
-                        module_args=async_module_args,
+                        module_args=async_status_args,
                         task_vars=task_vars,
                         wrap_async=False)
 
