@@ -61,11 +61,6 @@ class ActionModule(ActionBase):
 
         del async_result['ansible_job_id']
         del async_result['finished']
-
-        if async_result['restored_state'] is not None:
-            if async_result['restored_state'] == async_result['initial_state']:
-                async_result['changed'] = False
-
         return async_result
 
 
@@ -139,6 +134,24 @@ class ActionModule(ActionBase):
 
                 async_module_args = {}
                 async_module_args['jid'] = result['ansible_job_id']
+
+                ### Begin Ansible 2.7 -> 2.8 compatibility stuff {{{
+                set_async_dir = True
+                try:
+                    opt_async_dir = self.get_shell_option('async_dir', default="~/.ansible_async")
+                except AttributeError:
+                    set_async_dir = False
+
+                if set_async_dir:
+                    env_async_dir = [e for e in self._task.environment if "ANSIBLE_ASYNC_DIR" in e]
+                    if len(env_async_dir) > 0:
+                        async_dir = env_async_dir[0]['ANSIBLE_ASYNC_DIR']
+                    else:
+                        async_dir = opt_async_dir
+
+                    async_module_args['_async_dir'] = async_dir
+                ##### End Ansible 2.7 -> 2.8 compatibility stuff }}}
+
                 result = self._async_result('async_status', async_module_args, task_vars)
 
                 async_module_args['mode'] = 'cleanup'
