@@ -123,6 +123,11 @@ from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils._text import to_bytes
 
 
+IPTABLES = dict(
+        ipv4='iptables',
+        ipv6='ip6tables',
+)
+
 SAVE = dict(
         ipv4='iptables-save',
         ipv6='ip6tables-save',
@@ -132,6 +137,32 @@ RESTORE = dict(
         ipv4='iptables-restore',
         ipv6='ip6tables-restore',
 )
+
+TABLES = dict(
+        filter = ['INPUT', 'FORWARD', 'OUTPUT'],
+        mangle = ['PREROUTING','INPUT','FORWARD','OUTPUT','POSTROUTING'],
+        nat = ['PREROUTING','INPUT','OUTPUT','POSTROUTING'],
+        raw = ['PREROUTING','OUTPUT'],
+        security = ['INPUT', 'FORWARD', 'OUTPUT'],
+)
+
+
+# If related kernel modules are not loaded, iptables-save output is empty, so
+# it's not reliable to use it *as is* as input for iptables-restore in case of
+# rollback. On the other hand, loading these kernel modules is not enough for
+# iptables-nft (alternative to iptables-legacy on modern systems at the time
+# of writing) to get a usable output for this same purpose.
+def initialize_from_null_state(bin_iptables, table=None):
+    if not table: table = 'filter'
+
+    PARTCOMMAND = [bin_iptables, '-t', table, '-P']
+
+    for chain in TABLES[table]:
+        RESETPOLICY = list(PARTCOMMAND)
+        RESETPOLICY.append(chain)
+        RESETPOLICY.append('ACCEPT')
+        ( rc, out, err ) = module.run_command(RESETPOLICY, check_rc=True)
+    return True
 
 
 # Remove timestamps to ensure idempotency between runs. The removal of other
@@ -215,6 +246,7 @@ def main():
     _back = module.params['_back']
 
 
+    bin_iptables = module.get_bin_path(IPTABLES[ip_version], True)
     bin_iptables_save = module.get_bin_path(SAVE[ip_version], True)
     bin_iptables_restore = module.get_bin_path(RESTORE[ip_version], True)
 
@@ -236,8 +268,15 @@ def main():
     INITCOMMAND = list(COMMANDARGS)
     INITCOMMAND.insert(0, bin_iptables_save)
 
-    rc, stdout, stderr = module.run_command(INITCOMMAND, check_rc=True)
-    initial_state = reformat(stdout, counters)
+    for chance in (1, 2):
+        rc, stdout, stderr = module.run_command(INITCOMMAND, check_rc=True)
+        if stdout:
+            initial_state = reformat(stdout, counters)
+        elif initialize_from_null_state(bin_iptables, table=table):
+            changed = True
+
+    if not initial_state:
+        module.fail_json(msg="Unable to initialize firewall from NULL state.")
 
     if state == 'saved':
         checksum_old, checksum_new = writein(path, initial_state)
