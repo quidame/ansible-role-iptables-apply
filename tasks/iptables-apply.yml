@@ -5,10 +5,9 @@
 - name: "apply iptables ruleset and wait for confirmation"
   iptables_state:
     state: restored
-    path: "{{ iptables_apply__path_buffer }}"
-    back: "{{ iptables_apply__path_backup }}"
+    table: "{{ omit if iptables_apply__action in ['template','flush'] else 'filter' }}"
     noflush: "{{ iptables_apply__template_noflush if iptables_apply__action == 'template' else omit }}"
-    timeout: "{{ iptables_apply__rollback_timeout }}"
+    path: "{{ iptables_apply__path_buffer }}"
   async: "{{ iptables_apply__rollback_timeout }}"
   poll: 0
   register: iptables_apply__restored
