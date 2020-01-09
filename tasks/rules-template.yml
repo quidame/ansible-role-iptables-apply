@@ -6,5 +6,5 @@
     validate: "iptables-restore --test %s"
   register: iptables_apply__ruleset
   when:
-    - ( not iptables_apply__template_once|bool ) or
+    - ( not iptables_apply__template_once | bool ) or
       ( not iptables_apply__template_mark in iptables_apply__saved_state.initial_state )
