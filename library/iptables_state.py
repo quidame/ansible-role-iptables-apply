@@ -153,7 +153,7 @@ TABLES = dict(
 # iptables-nft (alternative to iptables-legacy on modern systems at the time
 # of writing) to get a usable output for this same purpose.
 def initialize_from_null_state(bin_iptables, table=None):
-    if not table: table = 'filter'
+    if table is None: table = 'filter'
 
     PARTCOMMAND = [bin_iptables, '-t', table, '-P']
 
@@ -270,7 +270,12 @@ def main():
 
     for chance in (1, 2):
         rc, stdout, stderr = module.run_command(INITCOMMAND, check_rc=True)
-        if stdout:
+        if table is None:
+            _table = 'filter'
+        else:
+            _table = table
+
+        if stdout and ( table is None or len(stdout.split('\n')) > len(TABLES[_table]) + 4 ):
             initial_state = reformat(stdout, counters)
         elif initialize_from_null_state(bin_iptables, table=table):
             changed = True
