@@ -451,7 +451,7 @@
           vars:
             iptables_apply__action: append
             iptables_apply__rules:
-              - "{{ rules_ssh[0] | combine({'jump':'DROP'}) }}"
+              - "{{ rules_ssh[0] | combine({'jump':'REJECT'}) }}"
       rescue:
         - name: "check expected error"
           assert:
