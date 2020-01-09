@@ -17,32 +17,21 @@ display = Display()
 
 class ActionModule(ActionBase):
 
-    DEFAULT_PATH = None
-    DEFAULT_BACK = None
-    DEFAULT_STATE = None
-    DEFAULT_TABLE = None
-    DEFAULT_TIMEOUT = None
-    DEFAULT_NOFLUSH = False
-    DEFAULT_COUNTERS = False
-    DEFAULT_MODPROBE = None
-    DEFAULT_IP_VERSION = 'ipv4'
-
+    _VALID_ARGS = frozenset(('path', 'state', 'table', 'noflush', 'counters', 'modprobe', 'ip_version'))
     DEFAULT_SUDOABLE = True
 
-    # I'm unable to override async_val AND poll values from here. So... just
-    # fail if they don't match the required values.
-    def _async_is_needed(self, module_name, module_timeout, task_async, task_poll, task_vars):
-        msg = ('Task attribute \'async\' (= %s) MUST be set to a value greater than or equal to '
-               '\'timeout\' module parameter (currently %s), and attribute \'poll\' (= %s) MUST '
-               'be set to 0, to enable rollback feature. This is also the case for the more global '
-               '\'ansible_timeout\' (= %s), which has to be greater or equal to the module param.'
-               % (task_async, module_timeout, task_poll, task_vars['ansible_timeout']))
-
-        if task_async < module_timeout or task_poll != 0:
-            raise AnsibleActionFail(msg)
-        else:
-            display.v("%s: run in background until completed or for max %s seconds." % (module_name, module_timeout))
-            return True
+    MSG_ERROR__ASYNC_AND_POLL_NOT_ZERO = (
+            "This module doesn't support async>0 and poll>0 when its 'state' param "
+            "is set to 'restored'. To enable its rollback feature (that needs the "
+            "module to run asynchronously on the remote), please set task attribute "
+            "'poll' to 0, and 'async' to a value not greater than 'ansible_timeout' "
+            "(recommended, not checked).")
+    MSG_WARNING__NO_ASYNC_IS_NO_ROLLBACK = (
+            "Attempts to restore iptables state without rollback in case of mistake "
+            "may lead the ansible controller to loose access to the hosts and never "
+            "regain it before fixing firewall rules through a serial console, or any "
+            "other way except SSH. Please set task attribute 'poll' to 0, and 'async' "
+            "to a value not greater than 'ansible_timeout' (recommended, not checked).")
 
 
     # Retrieve results of the asynchonous task, and display them in place of
@@ -75,17 +64,7 @@ class ActionModule(ActionBase):
         task_async = self._task.async_val
         task_poll = self._task.poll
         module_name = self._task.action
-        module_args = dict(
-                path = self._task.args.get('path', self.DEFAULT_PATH),
-                back = self._task.args.get('back', self.DEFAULT_BACK),
-                state = self._task.args.get('state', self.DEFAULT_STATE),
-                table = self._task.args.get('table', self.DEFAULT_TABLE),
-                timeout = self._task.args.get('timeout', self.DEFAULT_TIMEOUT),
-                noflush = self._task.args.get('noflush', self.DEFAULT_NOFLUSH),
-                counters = self._task.args.get('counters', self.DEFAULT_COUNTERS),
-                modprobe = self._task.args.get('modprobe', self.DEFAULT_MODPROBE),
-                ip_version = self._task.args.get('ip_version', self.DEFAULT_IP_VERSION),
-        )
+        module_args = self._task.args
 
 
         if not result.get('skipped'):
@@ -98,33 +77,43 @@ class ActionModule(ActionBase):
             # FUTURE: better to let _execute_module calculate this internally?
             wrap_async = self._task.async_val and not self._connection.has_native_async
 
-            if module_args['state'] == 'restored':
-                self._async_is_needed(
-                        module_name,
-                        int(module_args['timeout']),
-                        int(task_async),
-                        int(task_poll),
-                        task_vars)
+            if 'state' in module_args and module_args['state'] == 'restored':
+                if not task_async:
+                    display.warning(self.MSG_WARNING__NO_ASYNC_IS_NO_ROLLBACK)
+                elif task_poll:
+                    raise AnsibleActionFail(self.MSG_ERROR__ASYNC_AND_POLL_NOT_ZERO)
+                else:
+                    # Bind the loop max duration to the same value on both
+                    # remote and local sides, and set a backup file path.
+                    module_args['_timeout'] = task_async
+                    module_args['_back'] = '/run/iptables.state'
 
             # do work!
-            result = merge_hash(result, self._execute_module(task_vars=task_vars, wrap_async=wrap_async))
+            result = merge_hash(result, self._execute_module(module_args=module_args, task_vars=task_vars, wrap_async=wrap_async))
 
             # Then the 3-steps "go ahead or rollback":
             # - reset connection to ensure a persistent one will not be reused
-            # - confirm the restored state by removing the backup/cookie
-            # - retrieve results of the asynchronous task to return them
-            if module_args['state'] == 'restored':
+            # - confirm the restored state by removing the backup on the remote
+            # - retrieve the results of the asynchronous task to return them
+            if '_back' in module_args:
                 try:
                     self._connection.reset()
                     display.v("%s: reset connection" % (module_name))
                 except AttributeError:
-                    display.warning("Connection plugin does not allow to reset the connection")
+                    display.warning("Connection plugin does not allow to reset the connection.")
 
-                confirmation_command = 'rm %s' % module_args['back']
-                for x in range(int(module_args['timeout'])):
+                confirm_cmd = 'rm %s' % module_args['_back']
+                for x in range(int(module_args['_timeout'])):
                     time.sleep(1)
+                    # It is expected that the host may be unreachable. We don't
+                    # want to fail for that, since we can wait for the rollback
+                    # to happen, to access to the host again.
+                    # - AnsibleConnectionFailure covers rejected requests (i.e.
+                    #   by rules with '--jump REJECT')
+                    # - ansible_timeout is able to cover dropped requests (due
+                    #   to a rule or policy DROP) if not lower than async_val.
                     try:
-                        confirmation = self._low_level_execute_command(confirmation_command, sudoable=self.DEFAULT_SUDOABLE)
+                        confirm_res = self._low_level_execute_command(confirm_cmd, sudoable=self.DEFAULT_SUDOABLE)
                         break
                     except AnsibleConnectionFailure:
                         continue

@@ -71,18 +71,6 @@ options:
       - The file the iptables state should be restored from.
       - Required when I(state=saved) or I(state=restored).
     type: path
-  back:
-    description:
-      - The file the iptables state should be rolled back from.
-      - The file is removed in case of successfull rollback and has to be
-        removed from another task to avoid this rollback.
-    type: path
-  timeout:
-    description:
-      - The time in seconds after what the rollback happens if new ruleset is
-        not confirmed (based on existence of the backup file).
-    type: int
-    default: 20
 '''
 
 EXAMPLES = r'''
@@ -103,8 +91,6 @@ EXAMPLES = r'''
   iptables_state:
     state: restored
     path: /run/iptables.apply
-    back: /run/iptables.saved
-    timeout: "{{ ansible_timeout }}"
   async: "{{ ansible_timeout }}"
   poll: 0
 '''
@@ -138,13 +124,13 @@ from ansible.module_utils._text import to_bytes
 
 
 SAVE = dict(
-    ipv4='iptables-save',
-    ipv6='ip6tables-save',
+        ipv4='iptables-save',
+        ipv6='ip6tables-save',
 )
 
 RESTORE = dict(
-    ipv4='iptables-restore',
-    ipv6='ip6tables-restore',
+        ipv4='iptables-restore',
+        ipv6='ip6tables-restore',
 )
 
 
@@ -202,30 +188,31 @@ def main():
     module = AnsibleModule(
         supports_check_mode=False,
         argument_spec=dict(
-            ip_version=dict(type='str', default='ipv4', choices=['ipv4', 'ipv6']),
             path=dict(type='path'),
-            back=dict(type='path'),
             state=dict(type='str', choices=['saved', 'restored']),
             table=dict(type='str', choices=['filter', 'nat', 'mangle', 'raw', 'security']),
-            timeout=dict(type='int', default=20),
             noflush=dict(type='bool', default=False),
             counters=dict(type='bool', default=False),
             modprobe=dict(type='path'),
+            ip_version=dict(type='str', choices=['ipv4', 'ipv6'], default='ipv4'),
+            _timeout=dict(type='int'),
+            _back=dict(type='path'),
         ),
         required_together=[
             ['state', 'path'],
+            ['_timeout', '_back'],
         ],
     )
 
     path = module.params['path']
-    back = module.params['back']
     state = module.params['state']
     table = module.params['table']
-    timeout = module.params['timeout']
     noflush = module.params['noflush']
     counters = module.params['counters']
     modprobe = module.params['modprobe']
     ip_version = module.params['ip_version']
+    _timeout = module.params['_timeout']
+    _back = module.params['_back']
 
 
     bin_iptables_save = module.get_bin_path(SAVE[ip_version], True)
@@ -275,12 +262,12 @@ def main():
     MAINCOMMAND = list(COMMANDARGS)
     MAINCOMMAND.insert(0, bin_iptables_restore)
 
-    if back is not None:
-        checksum_old, checksum_new = writein(back, initial_state)
+    if _back is not None:
+        checksum_old, checksum_new = writein(_back, initial_state)
         if checksum_new != checksum_old:
             changed = True
         BACKCOMMAND = list(MAINCOMMAND)
-        BACKCOMMAND.append(back)
+        BACKCOMMAND.append(_back)
 
     if noflush:
         MAINCOMMAND.append('--noflush')
@@ -302,7 +289,7 @@ def main():
     if restored_state != initial_state:
         changed = True
 
-    if back is None:
+    if _back is None:
         module.exit_json(
                 applied=True,
                 changed=changed,
@@ -326,8 +313,8 @@ def main():
     #   timeout module param
     # * task attribute 'poll' equals 0
     #
-    for x in range(timeout):
-        if os.path.exists(back):
+    for x in range(_timeout):
+        if os.path.exists(_back):
             time.sleep(1)
             continue
         module.exit_json(
@@ -344,7 +331,7 @@ def main():
     rc, stdout, stderr = module.run_command(INITCOMMAND, check_rc=True)
     backed_state = reformat(stdout, counters)
 
-    os.remove(back)
+    os.remove(_back)
 
     module.fail_json(
             rollback_complete=(backed_state == initial_state),
