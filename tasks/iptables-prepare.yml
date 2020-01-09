@@ -4,17 +4,13 @@
 # state from nothing.
 
 
-- name: "ensure backup will not be empty"
-  block:
-    - import_tasks: iptables-init.yml
-
-  rescue:
-    - name: "initialize firewall from NULL state"
-      iptables:
-        chain: "{{ iptables_apply_item }}"
-        policy: ACCEPT
-      loop: ["INPUT", "FORWARD", "OUTPUT"]
-      loop_control:
-        loop_var: iptables_apply_item
-
-    - import_tasks: iptables-init.yml
+# The starting point for atomic changes with actions `append`, `insert` or
+# `delete`.  Actions `template` and `flush` will overwrite it entirely.
+- name: "save initial state of the firewall into temporary buffer"
+  iptables_state:
+    state: saved
+    path: "{{ iptables_apply__path_buffer }}"
+    table: "{{ omit if iptables_apply__action in ['template','flush'] else 'filter' }}"
+  register: iptables_apply__saved_state
+  failed_when:
+    - iptables_apply__saved_state.initial_state | length < 7
