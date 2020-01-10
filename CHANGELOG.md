@@ -1,5 +1,15 @@
 # iptables_apply
 
+## [4.0.0] 2020-01-10
+### Added
+- Action plugin `iptables_state`: manage the connection reset and the rollback
+  on its own.
+
+### Changed
+- Remove tasks now covered by the module (or the action plugin) and refactor
+  all others consequently.
+- Update tests.
+
 ## [3.0.0]
 ### Added
 - Ad hoc module `iptables_state` to manage saving and restoring iptables state
