@@ -1,7 +1,19 @@
 ---
+# Initialize iptables so the output of iptables-save will not be empty.
+# Otherwise, rolling back to previous state will not work when restoring this
+# state from nothing.
+- import_tasks: iptables_state.yml
+  vars:
+    iptables_state__task_name: "save initial state of the firewall into buffer"
+    iptables_state__state: saved
+    iptables_state__table: filter
+    iptables_state__path: "{{ iptables_apply__path_buffer }}"
+  failed_when:
+    - iptables_state__registered.initial_state | length < 7
+
+
 # The regexp being the same, a same task may be used to `append`, `insert` or
 # `delete` rules.
-
 - name: "{{ iptables_apply__action }}{{ '' if iptables_apply__action == 'delete' else '/update' }} rules in ruleset's buffer"
   lineinfile:
     # Do not perform action directly upon the system file nor the system state.
@@ -29,8 +41,8 @@
       iptables_apply_item.dport if ',' in iptables_apply_item.dport|string else '%s --dport %s' % (
       iptables_apply_item.protocol | d('tcp'),
       iptables_apply_item.dport) }} -m comment --comment {{
-      iptables_apply_item.name|regex_replace('^|$', '\"') if
-      iptables_apply_item.name|replace('-','_')|wordcount != 1 else
+      iptables_apply_item.name | regex_replace('^|$', '\"') if
+      iptables_apply_item.name | replace('-','_') | wordcount != 1 else
       iptables_apply_item.name }} -j {{
       iptables_apply_item.jump | d('ACCEPT') }}"
     state: "{{ 'absent' if iptables_apply__action == 'delete' else 'present' }}"

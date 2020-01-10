@@ -1,5 +1,15 @@
 ---
-- name: "rewrite iptables ruleset's buffer from scratch"
+# Initialize iptables so the output of iptables-save will not be empty.
+# Otherwise, rolling back to previous state will not work when restoring this
+# state from nothing.
+- import_tasks: iptables_state.yml
+  vars:
+    iptables_state__task_name: "get initial state of the firewall"
+  failed_when:
+    - iptables_state__registered.initial_state | length < 7
+
+
+- name: "rewrite iptables buffer from scratch"
   template:
     src: "{{ iptables_apply__template }}"
     dest: "{{ iptables_apply__path_buffer }}"
@@ -7,4 +17,4 @@
   register: iptables_apply__ruleset
   when:
     - ( not iptables_apply__template_once | bool ) or
-      ( not iptables_apply__template_mark in iptables_apply__saved_state.initial_state )
+      ( not iptables_apply__template_mark in iptables_state__registered.initial_state )
