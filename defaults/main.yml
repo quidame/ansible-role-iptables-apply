@@ -8,11 +8,12 @@
 # iptables_apply__action
 # iptables_apply__persist
 # iptables_apply__service
+# iptables_apply__service_ruleset
 # iptables_apply__service_enabled
 # iptables_apply__service_started
 # iptables_apply__path_backup
 # iptables_apply__path_buffer
-# iptables_apply__timeout
+# iptables_apply__rollback_timeout
 
 
 ################################################################################
@@ -52,6 +53,16 @@ iptables_apply__service: "{{ 'netfilter-persistent' if ansible_os_family == 'Deb
 
 
 ################################################################################
+# iptables_apply__service_ruleset
+#
+# The absolute path of the file where iptables state should be stored.
+#
+iptables_apply__service_ruleset: "{{
+  '/etc/iptables/rules.v4' if ansible_os_family == 'Debian' else
+  '/etc/sysconfig/iptables' }}"
+
+
+################################################################################
 # iptables_apply__service_enabled
 # iptables_apply__service_started
 #
@@ -75,12 +86,12 @@ iptables_apply__path_buffer: /run/iptables.apply
 
 
 ################################################################################
-# iptables_apply__timeout
+# iptables_apply__rollback_timeout
 #
 # The delay, in seconds, after what the initial iptables ruleset is restored if
 # not disabled by the confirmation task.
 #
-iptables_apply__timeout: 20
+iptables_apply__rollback_timeout: 20
 
 
 

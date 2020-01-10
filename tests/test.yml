@@ -49,6 +49,7 @@
           - name: "monitoring"
             dport: "161"
             protocol: "udp"
+        # Will be incrementend for each played test
         number: 1
 
 
@@ -85,20 +86,21 @@
       vars:
         iptables_apply__action: template
 
-    - name: "check backup content (table)"
+    - name: "check buffer content (table)"
       lineinfile:
-        path: "{{ iptables_apply__path_backup|default('/run/iptables.saved') }}"
+        path: "{{ iptables_apply__path_buffer | d('/run/iptables.apply') }}"
         line: "*filter"
       register: lineinfile
       failed_when: lineinfile is changed
 
-    - name: "check backup content (policies)"
+    - name: "check buffer content (policies)"
       replace:
-        path: "{{ iptables_apply__path_backup|default('/run/iptables.saved') }}"
+        path: "{{ iptables_apply__path_buffer | d('/run/iptables.apply') }}"
         regexp: '^(:(IN|OUT)PUT ACCEPT) \[[0-9]+:[0-9]+\]$'
-        replace: '\1 [0:0]'
+        replace: '\1'
       register: replace
       failed_when: replace is not changed
+      check_mode: yes
 
     - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/01): INITIALIZATION FROM NULL STATE WITH ACTION 'TEMPLATE'"
       set_fact:
@@ -139,28 +141,30 @@
       vars:
         iptables_apply__action: append
 
-    - name: "check backup content (table)"
+    - name: "check buffer content (table)"
       lineinfile:
-        path: "{{ iptables_apply__path_backup|default('/run/iptables.saved') }}"
+        path: "{{ iptables_apply__path_buffer | d('/run/iptables.apply') }}"
         line: "*filter"
       register: lineinfile
       failed_when: lineinfile is changed
 
-    - name: "check backup content (INPUT policy)"
+    - name: "check buffer content (INPUT policy)"
       lineinfile:
-        path: "{{ iptables_apply__path_backup|default('/run/iptables.saved') }}"
+        path: "{{ iptables_apply__path_buffer | d('/run/iptables.apply') }}"
         regexp: '^:INPUT ACCEPT .*'
         state: absent
       register: lineinfile
       failed_when: lineinfile is not changed
+      check_mode: yes
 
-    - name: "check backup content (OUTPUT policy)"
+    - name: "check buffer content (OUTPUT policy)"
       lineinfile:
-        path: "{{ iptables_apply__path_backup|default('/run/iptables.saved') }}"
+        path: "{{ iptables_apply__path_buffer | d('/run/iptables.apply') }}"
         regexp: '^:OUTPUT ACCEPT .*'
         state: absent
       register: lineinfile
       failed_when: lineinfile is not changed
+      check_mode: yes
 
     - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/02): INITIALIZATION FROM NULL STATE WITH ACTION 'APPEND'"
       set_fact:
@@ -188,7 +192,6 @@
         policy: DROP
       register: iptables
       failed_when: iptables is changed
-      check_mode: yes
 
     - name: "validate templated ruleset"
       iptables:
@@ -200,7 +203,6 @@
         jump: DROP
       register: iptables
       failed_when: iptables is changed
-      check_mode: yes
 
     - name: "validate 'template' action"
       systemd:
@@ -209,7 +211,6 @@
         state: started
       register: service_status
       failed_when: service_status is changed
-      check_mode: yes
 
     - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/03): ACTION 'TEMPLATE'"
       set_fact:
@@ -283,9 +284,11 @@
             iptables_apply__template_once: no
             iptables_apply__template_core: no
       rescue:
-        - name: "expected error"
-          debug:
-            msg: "A rollback occured when trying to apply bad ruleset from template"
+        - name: "check expected error"
+          assert:
+            that:
+              - iptables_apply__ruleset is changed
+              - iptables_apply__confirm is not changed
           register: rollback_template
 
     - name: "fail if role succeeded"
@@ -371,7 +374,6 @@
         state: present
       register: iptables
       failed_when: iptables is changed
-      check_mode: yes
       loop: "{{ rules_web }}"
       loop_control:
         loop_var: rule
@@ -450,9 +452,11 @@
             iptables_apply__rules:
               - "{{ rules_ssh[0] | combine({'jump':'DROP'}) }}"
       rescue:
-        - name: "expected error"
-          debug:
-            msg: "A rollback occured when trying to append a blocking rule"
+        - name: "check expected error"
+          assert:
+            that:
+              - iptables_apply__ruleset is changed
+              - iptables_apply__confirm is not changed
           register: rollback_append
 
     - name: "fail if role succeeded"
@@ -512,7 +516,6 @@
         state: present
       register: iptables
       failed_when: iptables is changed
-      check_mode: yes
       loop: "{{ to_insert }}"
       loop_control:
         loop_var: rule
@@ -587,9 +590,11 @@
             iptables_apply__rules:
               - "{{ rules_ssh[0] | combine({'jump':'DROP'}) }}"
       rescue:
-        - name: "expected error"
-          debug:
-            msg: "A rollback occured when trying to insert a blocking rule"
+        - name: "check expected error"
+          assert:
+            that:
+              - iptables_apply__ruleset is changed
+              - iptables_apply__confirm is not changed
           register: rollback_insert
 
     - name: "fail if role succeeded"
@@ -649,7 +654,6 @@
         state: absent
       register: iptables
       failed_when: iptables is changed
-      check_mode: yes
       loop: "{{ to_insert }}"
       loop_control:
         loop_var: rule
@@ -727,9 +731,11 @@
             iptables_apply__action: delete
             iptables_apply__rules: "{{ rules_ssh }}"
       rescue:
-        - name: "expected error"
-          debug:
-            msg: "A rollback occured when trying to delete a needed rule"
+        - name: "check expected error"
+          assert:
+            that:
+              - iptables_apply__ruleset is changed
+              - iptables_apply__confirm is not changed
           register: rollback_delete
 
     - name: "fail if role succeeded"
@@ -774,7 +780,6 @@
         state: present
       register: iptables
       failed_when: iptables is changed
-      check_mode: yes
       loop: "{{ rules_web }}"
       loop_control:
         loop_var: rule
@@ -806,9 +811,11 @@
               forward: ACCEPT
               output: DROP
       rescue:
-        - name: "expected error"
-          debug:
-            msg: "A rollback occured when trying to apply bad ruleset from template"
+        - name: "check expected error"
+          assert:
+            that:
+              - iptables_apply__ruleset is changed
+              - iptables_apply__confirm is not changed
           register: rollback_policy
 
     - name: "fail if role succeeded"
@@ -830,19 +837,23 @@
     - rollback
     - timeout
 
+  vars:
+    iptables_apply__rollback_timeout: "{{ lower_timeout | default(5) }}"
+
   tasks:
-    - name: "test rollback timeout (lower limit = {{ lower_timeout | default(5) }})"
+    - name: "test rollback timeout (lower limit = {{ iptables_apply__rollback_timeout }})"
       block:
         - include_role:
             name: iptables_apply
           vars:
             iptables_apply__template_once: no
             iptables_apply__template_core: no
-            iptables_apply__timeout: "{{ lower_timeout | default(5) }}"
       rescue:
-        - name: "expected error"
-          debug:
-            msg: "A rollback occured when trying to apply bad ruleset from template"
+        - name: "check expected error"
+          assert:
+            that:
+              - iptables_apply__ruleset is changed
+              - iptables_apply__confirm is not changed
           register: rollback_timeout_lower
 
     - name: "fail if role succeeded"
@@ -850,7 +861,7 @@
         msg: "There is some unexpected issue in rollback feature"
       when: rollback_timeout_lower is undefined
 
-    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/19): ROLLBACK WITH LOWER TIMEOUT ({{ lower_timeout | default(5) }}s)"
+    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/19): ROLLBACK WITH LOWER TIMEOUT ({{ iptables_apply__rollback_timeout }}s)"
       set_fact:
         number: "{{ number|int + 1 }}"
 
@@ -864,19 +875,23 @@
     - rollback
     - timeout
 
+  vars:
+    iptables_apply__rollback_timeout: "{{ upper_timeout | default(300) }}"
+
   tasks:
-    - name: "test rollback timeout (upper limit = {{ upper_timeout | default(60) }})"
+    - name: "test rollback timeout (upper limit = {{ iptables_apply__rollback_timeout }})"
       block:
         - include_role:
             name: iptables_apply
           vars:
             iptables_apply__template_once: no
             iptables_apply__template_core: no
-            iptables_apply__timeout: "{{ upper_timeout | default(60) }}"
       rescue:
-        - name: "expected error"
-          debug:
-            msg: "A rollback occured when trying to apply bad ruleset from template"
+        - name: "check expected error"
+          assert:
+            that:
+              - iptables_apply__ruleset is changed
+              - iptables_apply__confirm is not changed
           register: rollback_timeout_upper
 
     - name: "fail if role succeeded"
@@ -884,7 +899,7 @@
         msg: "There is some unexpected issue in rollback feature"
       when: rollback_timeout_upper is undefined
 
-    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/20): ROLLBACK WITH UPPER TIMEOUT ({{ upper_timeout | default(60) }}s)"
+    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/20): ROLLBACK WITH UPPER TIMEOUT ({{ iptables_apply__rollback_timeout }}s)"
       set_fact:
         number: "{{ number|int + 1 }}"
 
@@ -947,7 +962,6 @@
         state: "{{ rule.state }}"
       register: iptables
       failed_when: iptables is changed
-      check_mode: yes
       loop:
         - "{{ iptables_apply__template_rules[0] | combine({'state':'absent'}) }}"
         - "{{ iptables_apply__template_rules[1] | combine({'state':'absent'}) }}"

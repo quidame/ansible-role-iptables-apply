@@ -44,6 +44,11 @@ This role comes with the following features:
 - easy-to-write rules, with a list of dictionnaries with only two mandatory
   parameters.
 
+This role ships a custom ansible module `iptables_state` to manage saving and
+restoring firewall state to/from a file. TODO: a matching action plugin for
+better rollback management (including the connection reset and the removal of
+the cookie).
+
 Requirements
 ------------
 
@@ -123,7 +128,7 @@ iptables_apply__service: iptables
   is restored, if the applied one is not confirmed.
 
 ```yaml
-iptables_apply__timeout: 20
+iptables_apply__rollback_timeout: 20
 ```
 
 ### Advanced Variables
@@ -404,7 +409,7 @@ To make use of this role as a galaxy role, put the following lines in
 ```yaml
 - name: iptables_apply
   src: https://github.com/quidame/ansible-role-iptables_apply.git
-  version: 2.0.0
+  version: 3.0.0
   scm: git
 ```
 
