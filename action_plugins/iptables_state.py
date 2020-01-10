@@ -9,10 +9,7 @@ import time
 
 from ansible.plugins.action import ActionBase
 from ansible.utils.vars import merge_hash
-from ansible.utils.display import Display
 from ansible.errors import AnsibleError, AnsibleActionFail, AnsibleConnectionFailure
-
-display = Display()
 
 
 class ActionModule(ActionBase):
@@ -84,7 +81,7 @@ class ActionModule(ActionBase):
 
             if 'state' in module_args and module_args['state'] == 'restored':
                 if not task_async:
-                    display.warning(self.MSG_WARNING__NO_ASYNC_IS_NO_ROLLBACK)
+                    self._display.warning(self.MSG_WARNING__NO_ASYNC_IS_NO_ROLLBACK)
                 elif task_poll:
                     raise AnsibleActionFail(self.MSG_ERROR__ASYNC_AND_POLL_NOT_ZERO)
                 else:
@@ -103,9 +100,9 @@ class ActionModule(ActionBase):
             if '_back' in module_args:
                 try:
                     self._connection.reset()
-                    display.v("%s: reset connection" % (module_name))
+                    self._display.v("%s: reset connection" % (module_name))
                 except AttributeError:
-                    display.warning("Connection plugin does not allow to reset the connection.")
+                    self._display.warning("Connection plugin does not allow to reset the connection.")
 
                 confirm_cmd = 'rm %s' % module_args['_back']
                 for x in range(int(module_args['_timeout'])):
@@ -127,23 +124,26 @@ class ActionModule(ActionBase):
                 async_status_args = {}
                 async_status_args['jid'] = result['ansible_job_id']
 
-                ### Begin Ansible 2.7 -> 2.8 compatibility stuff {{{
-                set_async_dir = True
-                try:
-                    opt_async_dir = self.get_shell_option('async_dir', default="~/.ansible_async")
-                except AttributeError:
-                    set_async_dir = False
+                # BEGIN snippet from async_status action plugin
+                env_async_dir = [e for e in self._task.environment if
+                                 "ANSIBLE_ASYNC_DIR" in e]
+                if len(env_async_dir) > 0:
+                    # for backwards compatibility we need to get the dir from
+                    # ANSIBLE_ASYNC_DIR that is defined in the environment. This is
+                    # deprecated and will be removed in favour of shell options
+                    async_dir = env_async_dir[0]['ANSIBLE_ASYNC_DIR']
 
-                if set_async_dir:
-                    env_async_dir = [e for e in self._task.environment if "ANSIBLE_ASYNC_DIR" in e]
-                    if len(env_async_dir) > 0:
-                        async_dir = env_async_dir[0]['ANSIBLE_ASYNC_DIR']
-                    else:
-                        async_dir = opt_async_dir
+                    msg = "Setting the async dir from the environment keyword " \
+                          "ANSIBLE_ASYNC_DIR is deprecated. Set the async_dir " \
+                          "shell option instead"
+                    self._display.deprecated(msg, "2.12")
+                else:
+                    # inject the async directory based on the shell option into the
+                    # module args
+                    async_dir = self.get_shell_option('async_dir', default="~/.ansible_async")
+                ### END snippet from async_status action plugin
 
-                    async_status_args['_async_dir'] = async_dir
-                ##### End Ansible 2.7 -> 2.8 compatibility stuff }}}
-
+                async_status_args['_async_dir'] = async_dir
                 result = self._async_result('async_status', async_status_args, task_vars)
 
                 async_status_args['mode'] = 'cleanup'
