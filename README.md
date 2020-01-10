@@ -124,13 +124,6 @@ iptables_apply__rules:
 iptables_apply__service: iptables
 ```
 
-* This defines the delay, in seconds, after what the initial iptables ruleset
-  is restored, if the applied one is not confirmed.
-
-```yaml
-iptables_apply__rollback_timeout: 20
-```
-
 ### Advanced Variables
 
 * Whether or not to make the currently applied ruleset persistent across

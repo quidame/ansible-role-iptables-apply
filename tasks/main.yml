@@ -6,15 +6,15 @@
 - import_tasks: "rules-{{ iptables_apply__action }}.yml"
 
 
-# `async="{{ iptables_apply__rollback_timeout }}"` and `poll=0` are mandatory
-# to enable rollback feature.
+# `async="{{ ansible_timeout }}"` and `poll=0` are mandatory to enable rollback
+# feature.
 - name: "apply iptables ruleset and wait for confirmation"
   iptables_state:
     state: restored
     table: "{{ omit if iptables_apply__action in ['template','flush'] else 'filter' }}"
     noflush: "{{ iptables_apply__template_noflush if iptables_apply__action == 'template' else omit }}"
     path: "{{ iptables_apply__path_buffer }}"
-  async: "{{ iptables_apply__rollback_timeout }}"
+  async: "{{ ansible_timeout }}"
   poll: 0
   register: iptables_apply__restored
 
@@ -29,4 +29,5 @@
 
 
 # And finally, ensure the service is started and enabled (or not).
+# This task may be called apart with a 'tasks_from' too.
 - import_tasks: iptables-service.yml
