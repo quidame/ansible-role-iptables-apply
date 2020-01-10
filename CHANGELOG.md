@@ -1,5 +1,18 @@
 # iptables_apply
 
+## [3.0.0]
+### Added
+- Ad hoc module `iptables_state` to manage saving and restoring iptables state
+  to/from a file
+
+### Changed
+- Rename `iptables_apply__timeout` to `iptables_apply__rollback_timeout`
+- Refactor tasks to use the embedded module
+- Update tests playbook
+
+### Removed
+- Remove templated shell script, no more needed
+
 ## [2.0.0]
 ### Changed
 - Rename `iptables_apply__noflush` to `iptables_apply__template_noflush`
@@ -18,7 +31,7 @@
 
 ## [1.5.0] 2019-12-19
 ### Added
-- support for nft (iptables-nft
+- support for nft (iptables-nft)
 
 ## [1.4.0] 2019-05-19
 ### Changed
