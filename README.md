@@ -114,16 +114,6 @@ iptables_apply__rules:
     protocol: udp
 ```
 
-* The following variable defines the firewall's service name. As the
-  implementation may vary a lot, only two services are currently supported:
-  `iptables` for **Redhat** family, and `netfilter-persistent` for **Debian**
-  family.  To be usable by the role, an alternative service must implement a
-  `save` command. Default depends on the OS.
-
-```yaml
-iptables_apply__service: iptables
-```
-
 ### Advanced Variables
 
 * Whether or not to make the currently applied ruleset persistent across
@@ -131,6 +121,22 @@ iptables_apply__service: iptables
 
 ```yaml
 iptables_apply__persist: true
+```
+
+* The following variable defines the firewall's service name. As the
+  implementation may vary a lot, only two services are currently supported:
+  `iptables` for **Redhat** family, and `netfilter-persistent` for **Debian**
+  family.
+
+```yaml
+iptables_apply__service: iptables
+```
+
+* This variable defines the path of the file to save firewall state into,
+  to make the currently applied ruleset persistent across reboots.
+
+```yaml
+iptables_apply__service_ruleset: /etc/sysconfig/iptables
 ```
 
 * The two following variables are about firewall's service management.
@@ -141,13 +147,13 @@ iptables_apply__service_enabled: true
 iptables_apply__service_started: true
 ```
 
-* The two following variables define the paths of two temporary files to create
-  and work with, and then remove. There is absolutely no reason to modify their
-  values.
+* The following variable defines the path of a temporary file that will be
+  used as buffer, starting with initial state of the firewall (table filter
+  for actions `append`, `delete` or `insert`), or with templated rules (with
+  actions `template` or `flush`).
 
 ```yaml
-iptables_apply__path_backup: /run/iptables.saved
-iptables_apply__path_buffer: /run/iptables.apply
+iptables_apply__path_buffer: /run/iptables.buffer
 ```
 
 Template Variables
@@ -402,7 +408,7 @@ To make use of this role as a galaxy role, put the following lines in
 ```yaml
 - name: iptables_apply
   src: https://github.com/quidame/ansible-role-iptables_apply.git
-  version: 3.0.0
+  version: 4.0.0
   scm: git
 ```
 
