@@ -1,5 +1,0 @@
----
-- name: "confirm current ruleset as persistent"
-  iptables_state:
-    state: saved
-    path: "{{ iptables_apply__service_ruleset }}"

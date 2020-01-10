@@ -1,0 +1,14 @@
+---
+- name: "{{ iptables_state__task_name | d('iptables_state') }}"
+  iptables_state:
+    table:      "{{ iptables_state__table      | d(omit) }}"
+    state:      "{{ iptables_state__state      | d(omit) }}"
+    path:       "{{ iptables_state__path       | d(omit) }}"
+    noflush:    "{{ iptables_state__noflush    | d(omit) }}"
+    counters:   "{{ iptables_state__counters   | d(omit) }}"
+    modprobe:   "{{ iptables_state__modprobe   | d(omit) }}"
+    ip_version: "{{ iptables_state__ip_version | d(omit) }}"
+  async: "{{ (iptables_state__state | d() == 'restored') | ternary(ansible_timeout, omit) }}"
+  poll:  "{{ (iptables_state__state | d() == 'restored') | ternary(0, omit) }}"
+  register: iptables_state__registered
+  tags: always

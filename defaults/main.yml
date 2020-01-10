@@ -11,9 +11,7 @@
 # iptables_apply__service_ruleset
 # iptables_apply__service_enabled
 # iptables_apply__service_started
-# iptables_apply__path_backup
 # iptables_apply__path_buffer
-# iptables_apply__rollback_timeout
 
 
 ################################################################################
@@ -55,7 +53,8 @@ iptables_apply__service: "{{ 'netfilter-persistent' if ansible_os_family == 'Deb
 ################################################################################
 # iptables_apply__service_ruleset
 #
-# The absolute path of the file where iptables state should be stored.
+# The absolute path of the file where iptables state should be stored to make
+# it available to the service that will restore it at boot time.
 #
 iptables_apply__service_ruleset: "{{
   '/etc/iptables/rules.v4' if ansible_os_family == 'Debian' else
@@ -74,24 +73,13 @@ iptables_apply__service_started: true
 
 
 ################################################################################
-# iptables_apply__path_backup
 # iptables_apply__path_buffer
 #
 # Temporary files to work with.
 # - the backup is for rolling back to the initial rules
 # - the buffer is for building a new ruleset from template or backup
 #
-iptables_apply__path_backup: /run/iptables.saved
-iptables_apply__path_buffer: /run/iptables.apply
-
-
-################################################################################
-# iptables_apply__rollback_timeout
-#
-# The delay, in seconds, after what the initial iptables ruleset is restored if
-# not disabled by the confirmation task.
-#
-iptables_apply__rollback_timeout: 20
+iptables_apply__path_buffer: /run/iptables.buffer
 
 
 

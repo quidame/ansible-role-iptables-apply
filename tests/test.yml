@@ -32,7 +32,7 @@
       when:
         - ansible_os_family|lower in ["redhat"]
 
-    - name: "preset rules to append, insert, delete or template"
+    - name: "preset rules to append, insert, delete or template, and other stuff"
       set_fact:
         rules_web:
           - name: "Web HTTP/HTTPS"
@@ -49,12 +49,14 @@
           - name: "monitoring"
             dport: "161"
             protocol: "udp"
+        iptables_apply__path_buffer: "/run/iptables.apply"
         # Will be incrementend for each played test
         number: 1
+        total: 21
 
 
 ################################################################################
-- name: "01. TEST INITIALIZATION FROM NULL STATE WITH ACTION 'TEMPLATE'"
+- name: "01. TEST INITIALIZATION FROM NULL STATE WITH NO TABLE"
   hosts: tests
   gather_facts: no
   become: yes
@@ -78,37 +80,45 @@
       command: iptables-save
       register: command
       changed_when: false
-      failed_when: command.stdout_lines != []
+      failed_when: command.stdout_lines | length > 0
 
     - include_role:
         name: iptables_apply
-        tasks_from: iptables-prepare.yml
+        tasks_from: iptables_state.yml
       vars:
-        iptables_apply__action: template
+        iptables_state__task_name: "initialize firewall from NULL state"
+        iptables_state__path: "{{ iptables_apply__path_buffer }}"
+        iptables_state__state: saved
+
+    - name: "check iptables-save output is not empty"
+      command: iptables-save
+      register: command
+      changed_when: false
+      failed_when: command.stdout_lines | length == 0
 
     - name: "check buffer content (table)"
       lineinfile:
-        path: "{{ iptables_apply__path_buffer | d('/run/iptables.apply') }}"
+        path: "{{ iptables_apply__path_buffer }}"
         line: "*filter"
       register: lineinfile
       failed_when: lineinfile is changed
 
     - name: "check buffer content (policies)"
       replace:
-        path: "{{ iptables_apply__path_buffer | d('/run/iptables.apply') }}"
+        path: "{{ iptables_apply__path_buffer }}"
         regexp: '^(:(IN|OUT)PUT ACCEPT) \[[0-9]+:[0-9]+\]$'
         replace: '\1'
       register: replace
       failed_when: replace is not changed
       check_mode: yes
 
-    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/01): INITIALIZATION FROM NULL STATE WITH ACTION 'TEMPLATE'"
+    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/01): INITIALIZATION FROM NULL STATE WITH NO TABLE"
       set_fact:
         number: "{{ number|int + 1 }}"
 
 
 ################################################################################
-- name: "02. TEST INITIALIZATION FROM NULL STATE WITH ACTION 'APPEND'"
+- name: "02. TEST INITIALIZATION FROM NULL STATE WITH TABLE FILTER"
   hosts: tests
   gather_facts: no
   become: yes
@@ -133,24 +143,33 @@
       command: iptables-save
       register: command
       changed_when: false
-      failed_when: command.stdout_lines != []
+      failed_when: command.stdout_lines | length > 0
 
     - include_role:
         name: iptables_apply
-        tasks_from: iptables-prepare.yml
+        tasks_from: iptables_state.yml
       vars:
-        iptables_apply__action: append
+        iptables_state__task_name: "initialize firewall from NULL state"
+        iptables_state__path: "{{ iptables_apply__path_buffer }}"
+        iptables_state__state: saved
+        iptables_state__table: filter
+
+    - name: "check iptables-save output is not empty"
+      command: iptables-save
+      register: command
+      changed_when: false
+      failed_when: command.stdout_lines | length == 0
 
     - name: "check buffer content (table)"
       lineinfile:
-        path: "{{ iptables_apply__path_buffer | d('/run/iptables.apply') }}"
+        path: "{{ iptables_apply__path_buffer }}"
         line: "*filter"
       register: lineinfile
       failed_when: lineinfile is changed
 
     - name: "check buffer content (INPUT policy)"
       lineinfile:
-        path: "{{ iptables_apply__path_buffer | d('/run/iptables.apply') }}"
+        path: "{{ iptables_apply__path_buffer }}"
         regexp: '^:INPUT ACCEPT .*'
         state: absent
       register: lineinfile
@@ -159,14 +178,14 @@
 
     - name: "check buffer content (OUTPUT policy)"
       lineinfile:
-        path: "{{ iptables_apply__path_buffer | d('/run/iptables.apply') }}"
+        path: "{{ iptables_apply__path_buffer }}"
         regexp: '^:OUTPUT ACCEPT .*'
         state: absent
       register: lineinfile
       failed_when: lineinfile is not changed
       check_mode: yes
 
-    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/02): INITIALIZATION FROM NULL STATE WITH ACTION 'APPEND'"
+    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/02): INITIALIZATION FROM NULL STATE WITH TABLE FILTER"
       set_fact:
         number: "{{ number|int + 1 }}"
 
@@ -179,6 +198,17 @@
   tags:
     - template
     - action
+
+  pre_tasks:
+    - name: "remove a rule coming from templated ruleset"
+      iptables:
+        chain: INPUT
+        protocol: tcp
+        match: tcp
+        syn: negate
+        comment: "bad NEWs"
+        jump: DROP
+        state: absent
 
   roles:
     - role: iptables_apply
@@ -218,7 +248,56 @@
 
 
 ################################################################################
-- name: "04. TEST INDEMPOTENCY OF ACTION 'TEMPLATE'"
+# Ensure the parameter that forces to reapply the template is working.
+- name: "04. TEST OVERWRITE OF ACTION 'TEMPLATE'"
+  hosts: tests
+  gather_facts: no
+  become: yes
+  tags:
+    - template
+    - overwrite
+
+  pre_tasks:
+    - name: "add a rule not provided by template"
+      iptables:
+        chain: "{{ rule.chain | default('INPUT') }}"
+        protocol: "{{ rule.protocol | default('tcp') }}"
+        match: "{{ 'multiport' if ',' in rule.dport|string else omit }}"
+        destination_port: "{{ rule.dport }}"
+        comment: "{{ rule.name }}"
+        jump: "{{ rule.jump | default('ACCEPT') }}"
+        state: present
+      loop: "{{ rules_web }}"
+      loop_control:
+        loop_var: rule
+
+  roles:
+    - role: iptables_apply
+      iptables_apply__template_once: no
+
+  tasks:
+    - name: "check the rule not provided by template is not here"
+      iptables:
+        chain: "{{ rule.chain | default('INPUT') }}"
+        protocol: "{{ rule.protocol | default('tcp') }}"
+        match: "{{ 'multiport' if ',' in rule.dport|string else omit }}"
+        destination_port: "{{ rule.dport }}"
+        comment: "{{ rule.name }}"
+        jump: "{{ rule.jump | default('ACCEPT') }}"
+        state: absent
+      loop: "{{ rules_web }}"
+      loop_control:
+        loop_var: rule
+      register: iptables
+      failed_when: iptables is changed
+
+    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/04): OVERWRITE OF ACTION 'TEMPLATE'"
+      set_fact:
+        number: "{{ number|int + 1 }}"
+
+
+################################################################################
+- name: "05. TEST INDEMPOTENCY OF ACTION 'TEMPLATE'"
   hosts: tests
   gather_facts: no
   become: yes
@@ -228,39 +307,26 @@
 
   roles:
     - role: iptables_apply
-
-  tasks:
-    - name: "idempotency failure"
-      fail:
-        msg: "There is some lack of idempotency in 'template'"
-      when: iptables_apply__ruleset is changed
-
-    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/04): IDEMPOTENCY OF ACTION 'TEMPLATE'"
-      set_fact:
-        number: "{{ number|int + 1 }}"
-
-
-################################################################################
-# Ensure the parameter that forces to reapply the template is working.
-- name: "05. TEST OVERWRITE OF ACTION 'TEMPLATE'"
-  hosts: tests
-  gather_facts: no
-  become: yes
-  tags:
-    - template
-    - overwrite
-
-  roles:
-    - role: iptables_apply
       iptables_apply__template_once: no
 
   tasks:
-    - name: "force-overwrite failure"
-      fail:
-        msg: "There is some lack of *force overwrite* in 'template'"
-      when: iptables_apply__ruleset is not changed
+    - name: "blank variables"
+      set_fact:
+        iptables_state__registered: ""
+        iptables_apply__restored: ""
+        iptables_apply__ruleset: ""
 
-    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/05): OVERWRITE OF ACTION 'TEMPLATE'"
+    - include_role:
+        name: iptables_apply
+
+    - name: "check for idempotency of all tasks"
+      assert:
+        that:
+          - iptables_state__registered is not changed
+          - iptables_apply__restored is not changed
+          - iptables_apply__ruleset is not changed
+
+    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/05): IDEMPOTENCY OF ACTION 'TEMPLATE'"
       set_fact:
         number: "{{ number|int + 1 }}"
 
@@ -288,13 +354,14 @@
           assert:
             that:
               - iptables_apply__ruleset is changed
-              - iptables_apply__confirm is not changed
+              - iptables_apply__restored.applied is defined
+              - not iptables_apply__restored.applied
           register: rollback_template
 
     - name: "fail if role succeeded"
       fail:
         msg: "There is some unexpected issue in rollback feature"
-      when: rollback_template is undefined
+      failed_when: rollback_template is undefined
 
     - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/06): ROLLBACK FOR ACTION 'TEMPLATE'"
       set_fact:
@@ -416,10 +483,12 @@
       iptables_apply__rules: "{{ rules_web }}"
 
   tasks:
-    - name: "idempotency failure"
-      fail:
-        msg: "There is some lack of idempotency in 'append'"
-      when: iptables_apply__ruleset is changed
+    - name: "check for idempotency of all tasks"
+      assert:
+        that:
+          - iptables_state__registered is not changed
+          - iptables_apply__restored is not changed
+          - iptables_apply__ruleset is not changed
 
     - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/09): IDEMPOTENCY OF ACTION 'APPEND'"
       set_fact:
@@ -450,19 +519,20 @@
           vars:
             iptables_apply__action: append
             iptables_apply__rules:
-              - "{{ rules_ssh[0] | combine({'jump':'DROP'}) }}"
+              - "{{ rules_ssh[0] | combine({'jump':'REJECT'}) }}"
       rescue:
         - name: "check expected error"
           assert:
             that:
               - iptables_apply__ruleset is changed
-              - iptables_apply__confirm is not changed
+              - iptables_apply__restored.applied is defined
+              - not iptables_apply__restored.applied
           register: rollback_append
 
     - name: "fail if role succeeded"
       fail:
         msg: "There is some unexpected issue in rollback feature"
-      when: rollback_append is undefined
+      failed_when: rollback_append is undefined
 
     - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/10): ROLLBACK FOR ACTION 'APPEND'"
       set_fact:
@@ -558,10 +628,12 @@
       iptables_apply__rules: "{{ to_insert }}"
 
   tasks:
-    - name: "idempotency failure"
-      fail:
-        msg: "There is some lack of idempotency in 'insert'"
-      when: iptables_apply__ruleset is changed
+    - name: "check for idempotency of all tasks"
+      assert:
+        that:
+          - iptables_state__registered is not changed
+          - iptables_apply__restored is not changed
+          - iptables_apply__ruleset is not changed
 
     - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/12): IDEMPOTENCY OF ACTION 'INSERT'"
       set_fact:
@@ -594,13 +666,14 @@
           assert:
             that:
               - iptables_apply__ruleset is changed
-              - iptables_apply__confirm is not changed
+              - iptables_apply__restored.applied is defined
+              - not iptables_apply__restored.applied
           register: rollback_insert
 
     - name: "fail if role succeeded"
       fail:
         msg: "There is some unexpected issue in rollback feature"
-      when: rollback_insert is undefined
+      failed_when: rollback_insert is undefined
 
     - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/13): ROLLBACK FOR ACTION 'INSERT'"
       set_fact:
@@ -623,6 +696,8 @@
   pre_tasks:
     - include_role:
         name: iptables_apply
+      vars:
+        iptables_apply__template_once: no
 
     - name: "check the rule to delete is there"
       iptables:
@@ -696,10 +771,12 @@
       iptables_apply__rules: "{{ to_insert }}"
 
   tasks:
-    - name: "idempotency failure"
-      fail:
-        msg: "There is some lack of idempotency in 'delete'"
-      when: iptables_apply__ruleset is changed
+    - name: "check for idempotency of all tasks"
+      assert:
+        that:
+          - iptables_state__registered is not changed
+          - iptables_apply__restored is not changed
+          - iptables_apply__ruleset is not changed
 
     - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/15): IDEMPOTENCY OF ACTION 'DELETE'"
       set_fact:
@@ -735,13 +812,14 @@
           assert:
             that:
               - iptables_apply__ruleset is changed
-              - iptables_apply__confirm is not changed
+              - iptables_apply__restored.applied is defined
+              - not iptables_apply__restored.applied
           register: rollback_delete
 
     - name: "fail if role succeeded"
       fail:
         msg: "There is some unexpected issue in rollback feature"
-      when: rollback_delete is undefined
+      failed_when: rollback_delete is undefined
 
     - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/16): ROLLBACK FOR ACTION 'DELETE'"
       set_fact:
@@ -801,6 +879,11 @@
   tasks:
     - name: "test rollback after bad policy"
       block:
+        - name: "remove iptables buffer"
+          file:
+            path: "{{ iptables_apply__path_buffer }}"
+            state: absent
+
         - include_role:
             name: iptables_apply
           vars:
@@ -815,13 +898,14 @@
           assert:
             that:
               - iptables_apply__ruleset is changed
-              - iptables_apply__confirm is not changed
+              - iptables_apply__restored.applied is defined
+              - not iptables_apply__restored.applied
           register: rollback_policy
 
     - name: "fail if role succeeded"
       fail:
         msg: "There is some unexpected issue in rollback feature"
-      when: rollback_policy is undefined
+      failed_when: rollback_policy is undefined
 
     - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/18): ROLLBACK WITH A BAD POLICY"
       set_fact:
@@ -836,13 +920,20 @@
   tags:
     - rollback
     - timeout
+    - lower
 
   vars:
-    iptables_apply__rollback_timeout: "{{ lower_timeout | default(5) }}"
+    ansible_timeout: "{{ lower_timeout | default(5) }}"
+    iptables_apply__rollback_timeout: "{{ ansible_timeout }}"
 
   tasks:
     - name: "test rollback timeout (lower limit = {{ iptables_apply__rollback_timeout }})"
       block:
+        - name: "remove iptables buffer"
+          file:
+            path: "{{ iptables_apply__path_buffer }}"
+            state: absent
+
         - include_role:
             name: iptables_apply
           vars:
@@ -853,13 +944,14 @@
           assert:
             that:
               - iptables_apply__ruleset is changed
-              - iptables_apply__confirm is not changed
+              - iptables_apply__restored.applied is defined
+              - not iptables_apply__restored.applied
           register: rollback_timeout_lower
 
     - name: "fail if role succeeded"
       fail:
         msg: "There is some unexpected issue in rollback feature"
-      when: rollback_timeout_lower is undefined
+      failed_when: rollback_timeout_lower is undefined
 
     - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/19): ROLLBACK WITH LOWER TIMEOUT ({{ iptables_apply__rollback_timeout }}s)"
       set_fact:
@@ -874,13 +966,20 @@
   tags:
     - rollback
     - timeout
+    - upper
 
   vars:
-    iptables_apply__rollback_timeout: "{{ upper_timeout | default(300) }}"
+    ansible_timeout: "{{ upper_timeout | default(300) }}"
+    iptables_apply__rollback_timeout: "{{ ansible_timeout }}"
 
   tasks:
     - name: "test rollback timeout (upper limit = {{ iptables_apply__rollback_timeout }})"
       block:
+        - name: "remove iptables buffer"
+          file:
+            path: "{{ iptables_apply__path_buffer }}"
+            state: absent
+
         - include_role:
             name: iptables_apply
           vars:
@@ -891,13 +990,14 @@
           assert:
             that:
               - iptables_apply__ruleset is changed
-              - iptables_apply__confirm is not changed
+              - iptables_apply__restored.applied is defined
+              - not iptables_apply__restored.applied
           register: rollback_timeout_upper
 
     - name: "fail if role succeeded"
       fail:
         msg: "There is some unexpected issue in rollback feature"
-      when: rollback_timeout_upper is undefined
+      failed_when: rollback_timeout_upper is undefined
 
     - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/20): ROLLBACK WITH UPPER TIMEOUT ({{ iptables_apply__rollback_timeout }}s)"
       set_fact:
@@ -978,12 +1078,14 @@
 ################################################################################
 - name: "CONGRATULATIONS"
   hosts: tests
+  gather_facts: no
   tags: always
   tasks:
     - name: "results overview"
       debug:
         msg:
-          - "Successfully passed {{ number|int - 1 }} (/21) tests"
-          - "role = iptables_apply"
-          - "tags = {{ ansible_run_tags | join(',') }}"
-          - "skip-tags = {{ ansible_skip_tags | join(',') }}"
+          - "iptables_apply"
+          - "--tags {{ ansible_run_tags | join(',') }}"
+          - "--skip-tags {{ ansible_skip_tags | join(',') }}"
+          - "{{ '%02d' % (total - (number|int - 1)) }} unplayed tests"
+          - "successfully passed {{ '%02d' % (number|int - 1) }}/{{ total }} tests"
