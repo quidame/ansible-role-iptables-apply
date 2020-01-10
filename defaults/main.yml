@@ -11,7 +11,6 @@
 # iptables_apply__service_ruleset
 # iptables_apply__service_enabled
 # iptables_apply__service_started
-# iptables_apply__path_backup
 # iptables_apply__path_buffer
 
 
@@ -74,15 +73,13 @@ iptables_apply__service_started: true
 
 
 ################################################################################
-# iptables_apply__path_backup
 # iptables_apply__path_buffer
 #
 # Temporary files to work with.
 # - the backup is for rolling back to the initial rules
 # - the buffer is for building a new ruleset from template or backup
 #
-iptables_apply__path_backup: /run/iptables.saved
-iptables_apply__path_buffer: /run/iptables.apply
+iptables_apply__path_buffer: /run/iptables.buffer
 
 
 
