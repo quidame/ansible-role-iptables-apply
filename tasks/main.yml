@@ -1,10 +1,4 @@
 ---
-# Perform a safety check to ensure rollback will happen if needed, and also
-# ensure the backup of initial ruleset is suitable for a rollback if needed
-# (i.e. not an empty file).
-- import_tasks: iptables-prepare.yml
-
-
 # Do all the stuff using a template, or just delete/append/insert/update rules.
 # Do not ever try to modify system state (iptables state) nor system files (in
 # /etc) at this step.  All actions are performed against a temporary file, the
@@ -12,16 +6,28 @@
 - import_tasks: "rules-{{ iptables_apply__action }}.yml"
 
 
-# Actually apply the ruleset and try to confirm it.
-- import_tasks: iptables-apply.yml
+# `async="{{ ansible_timeout }}"` and `poll=0` are mandatory to enable rollback
+# feature.
+- name: "apply iptables ruleset and wait for confirmation"
+  iptables_state:
+    state: restored
+    table: "{{ omit if iptables_apply__action in ['template','flush'] else 'filter' }}"
+    noflush: "{{ iptables_apply__template_noflush if iptables_apply__action == 'template' else omit }}"
+    path: "{{ iptables_apply__path_buffer }}"
+  async: "{{ ansible_timeout }}"
+  poll: 0
+  register: iptables_apply__restored
 
 
 # Save current state of the firewall on the disk (file in /etc).
-- import_tasks: iptables-persist.yml
+- name: "confirm current ruleset as persistent"
+  iptables_state:
+    state: saved
+    path: "{{ iptables_apply__service_ruleset }}"
   when:
-    - iptables_apply__ruleset is changed
     - iptables_apply__persist | bool
 
 
 # And finally, ensure the service is started and enabled (or not).
+# This task may be called apart with a 'tasks_from' too.
 - import_tasks: iptables-service.yml
