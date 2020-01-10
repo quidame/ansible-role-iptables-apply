@@ -25,6 +25,9 @@ description:
     same as the behaviour of the C(iptables-save) and C(iptables-restore)
     (or C(ip6tables-save) and C(ip6tables-restore) for IPv6) commands which
     this module uses internally.
+  - NOTE - When restoring the running state from a file, it is highly
+    recommended to enable the module's rollback feature by playing it
+    asynchronously, i.e. by setting task attributes I(async=10) and I(poll=0).
 options:
   table:
     description:
@@ -82,15 +85,34 @@ EXAMPLES = r'''
   debug:
     var: iptables_state.initial_state
 
+# This will apply to all loaded/active IPv4 tables.
 - name: Save current state of the firewall in system file
   iptables_state:
     state: saved
     path: /etc/sysconfig/iptables
 
+# This will apply only to IPv6 filter table.
+- name: Save current state of the firewall in system file
+  iptables_state:
+    ip_version: ipv6
+    table: filter
+    state: saved
+    path: /etc/iptables/rules.v6
+
+# This will load a state from a file, with a rollback in case of access loss
 - name: Restore firewall state from a file
   iptables_state:
     state: restored
     path: /run/iptables.apply
+  async: "{{ ansible_timeout }}"
+  poll: 0
+
+# This will load new rules by appending them to the current ones
+- name: Restore firewall state from a file
+  iptables_state:
+    state: restored
+    path: /run/iptables.apply
+    noflush: true
   async: "{{ ansible_timeout }}"
   poll: 0
 '''
@@ -105,7 +127,7 @@ initial_state:
     type: list
     returned: always
 restored_state:
-    description: the new state of the firewall, when state=restored
+    description: the state the module restored, whenever it is applied or not
     type: list
     returned: always
 rollback_complete:
@@ -307,9 +329,7 @@ def main():
     MAINCOMMAND.insert(0, bin_iptables_restore)
 
     if _back is not None:
-        checksum_old, checksum_new = writein(_back, initial_state)
-        if checksum_new != checksum_old:
-            changed = True
+        garbage = writein(_back, initial_state)
         BACKCOMMAND = list(MAINCOMMAND)
         BACKCOMMAND.append(_back)
 
