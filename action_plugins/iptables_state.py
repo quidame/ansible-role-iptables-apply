@@ -1,5 +1,4 @@
-# (c) 2020, quidame <quidame@poivron.org>
-# (c) 2012, Michael DeHaan <michael.dehaan@gmail.com>
+# Copyright: (c) 2020, quidame <quidame@poivron.org>
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 from __future__ import (absolute_import, division, print_function)
@@ -10,7 +9,9 @@ import time
 from ansible.plugins.action import ActionBase
 from ansible.utils.vars import merge_hash
 from ansible.errors import AnsibleError, AnsibleActionFail, AnsibleConnectionFailure
+from ansible.utils.display import Display
 
+display = Display()
 
 class ActionModule(ActionBase):
 
@@ -35,9 +36,8 @@ class ActionModule(ActionBase):
     # the async wrapper results (those with the ansible_job_id key).
     def _async_result(self, module_name, module_args, task_vars):
         async_result = {}
-        async_result['finished'] = 0
 
-        while async_result['finished'] == 0:
+        while int(async_result.get('finished', 0)) != 1:
             async_result = self._execute_module(
                     module_name=module_name,
                     module_args=module_args,
@@ -81,7 +81,7 @@ class ActionModule(ActionBase):
 
             if 'state' in module_args and module_args['state'] == 'restored':
                 if not task_async:
-                    self._display.warning(self.MSG_WARNING__NO_ASYNC_IS_NO_ROLLBACK)
+                    display.warning(self.MSG_WARNING__NO_ASYNC_IS_NO_ROLLBACK)
                 elif task_poll:
                     raise AnsibleActionFail(self.MSG_ERROR__ASYNC_AND_POLL_NOT_ZERO)
                 else:
@@ -100,16 +100,13 @@ class ActionModule(ActionBase):
             if '_back' in module_args:
                 try:
                     self._connection.reset()
-                    self._display.v("%s: reset connection" % (module_name))
+                    display.v("%s: reset connection" % (module_name))
                 except AttributeError:
-                    self._display.warning("Connection plugin does not allow to reset the connection.")
+                    display.warning("Connection plugin does not allow to reset the connection.")
 
                 confirm_cmd = 'rm %s' % module_args['_back']
                 for x in range(int(module_args['_timeout'])):
                     time.sleep(1)
-                    # It is expected that the host may be unreachable. We don't
-                    # want to fail for that, since we can wait for the rollback
-                    # to happen, to access to the host again.
                     # - AnsibleConnectionFailure covers rejected requests (i.e.
                     #   by rules with '--jump REJECT')
                     # - ansible_timeout is able to cover dropped requests (due
@@ -120,9 +117,10 @@ class ActionModule(ActionBase):
                     except AnsibleConnectionFailure:
                         continue
 
-
                 async_status_args = {}
-                async_status_args['jid'] = result['ansible_job_id']
+                async_status_args['jid'] = result.get('ansible_job_id', None)
+                if async_status_args['jid'] is None:
+                    raise AnsibleActionFail("Unable to get 'ansible_job_id'.")
 
                 # BEGIN snippet from async_status action plugin
                 env_async_dir = [e for e in self._task.environment if
@@ -136,7 +134,7 @@ class ActionModule(ActionBase):
                     msg = "Setting the async dir from the environment keyword " \
                           "ANSIBLE_ASYNC_DIR is deprecated. Set the async_dir " \
                           "shell option instead"
-                    self._display.deprecated(msg, "2.12")
+                    display.deprecated(msg, "2.12")
                 else:
                     # inject the async directory based on the shell option into the
                     # module args
