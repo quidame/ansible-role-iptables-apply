@@ -325,6 +325,7 @@
           - iptables_state__registered is not changed
           - iptables_apply__restored is not changed
           - iptables_apply__ruleset is not changed
+        quiet: yes
 
     - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/05): IDEMPOTENCY OF ACTION 'TEMPLATE'"
       set_fact:
@@ -356,6 +357,7 @@
               - iptables_apply__ruleset is changed
               - iptables_apply__restored.applied is defined
               - not iptables_apply__restored.applied
+            quiet: yes
           register: rollback_template
 
     - name: "fail if role succeeded"
@@ -489,6 +491,7 @@
           - iptables_state__registered is not changed
           - iptables_apply__restored is not changed
           - iptables_apply__ruleset is not changed
+        quiet: yes
 
     - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/09): IDEMPOTENCY OF ACTION 'APPEND'"
       set_fact:
@@ -527,6 +530,7 @@
               - iptables_apply__ruleset is changed
               - iptables_apply__restored.applied is defined
               - not iptables_apply__restored.applied
+            quiet: yes
           register: rollback_append
 
     - name: "fail if role succeeded"
@@ -634,6 +638,7 @@
           - iptables_state__registered is not changed
           - iptables_apply__restored is not changed
           - iptables_apply__ruleset is not changed
+        quiet: yes
 
     - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/12): IDEMPOTENCY OF ACTION 'INSERT'"
       set_fact:
@@ -668,6 +673,7 @@
               - iptables_apply__ruleset is changed
               - iptables_apply__restored.applied is defined
               - not iptables_apply__restored.applied
+            quiet: yes
           register: rollback_insert
 
     - name: "fail if role succeeded"
@@ -777,6 +783,7 @@
           - iptables_state__registered is not changed
           - iptables_apply__restored is not changed
           - iptables_apply__ruleset is not changed
+        quiet: yes
 
     - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/15): IDEMPOTENCY OF ACTION 'DELETE'"
       set_fact:
@@ -814,6 +821,7 @@
               - iptables_apply__ruleset is changed
               - iptables_apply__restored.applied is defined
               - not iptables_apply__restored.applied
+            quiet: yes
           register: rollback_delete
 
     - name: "fail if role succeeded"
@@ -900,6 +908,7 @@
               - iptables_apply__ruleset is changed
               - iptables_apply__restored.applied is defined
               - not iptables_apply__restored.applied
+            quiet: yes
           register: rollback_policy
 
     - name: "fail if role succeeded"
@@ -946,6 +955,7 @@
               - iptables_apply__ruleset is changed
               - iptables_apply__restored.applied is defined
               - not iptables_apply__restored.applied
+            quiet: yes
           register: rollback_timeout_lower
 
     - name: "fail if role succeeded"
@@ -992,6 +1002,7 @@
               - iptables_apply__ruleset is changed
               - iptables_apply__restored.applied is defined
               - not iptables_apply__restored.applied
+            quiet: yes
           register: rollback_timeout_upper
 
     - name: "fail if role succeeded"
