@@ -870,7 +870,7 @@
       loop_control:
         loop_var: rule
 
-    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/17): NO FLUSH OF ACTION 'TEMPLATE'"
+    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/17): NOFLUSH OF ACTION 'TEMPLATE'"
       set_fact:
         number: "{{ number|int + 1 }}"
 
