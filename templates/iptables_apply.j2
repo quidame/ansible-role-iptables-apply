@@ -1,11 +1,32 @@
 # {{ ansible_managed }}
-# role: {{ role_name }}
-# {{ iptables_apply__action }}
-
 {###############################################################################
   This template only applies to the filter table
 #}
 *filter
+
+{#-
+  There are only 4 userland states: NEW, ESTABLISHED, RELATED and INVALID. That
+  means that any packet that was not caught by the two first rules is NEW, so
+  it's useless to specify this criterion in the next rules.
+#}
+{%- set core_rules = [
+    'INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT',
+    'INPUT -m conntrack --ctstate INVALID -j DROP',
+    'INPUT -i lo -m comment --comment "loopback" -j ACCEPT',
+    'INPUT -p icmp -m comment --comment "ICMP" -j ACCEPT',
+    'INPUT -p udp -m udp --sport :1023 -m comment --comment "bad source port" -j DROP',
+    'INPUT -p tcp -m tcp --sport :1023 -m comment --comment "bad source port" -j DROP',
+    'INPUT -p tcp -m tcp ! --syn -m comment --comment "bad NEWs" -j DROP',
+    'INPUT -p tcp -m tcp --dport %s -m comment --comment "SSH" -j ACCEPT' % (ansible_port | d(22)),
+    'OUTPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT',
+    'OUTPUT -m conntrack --ctstate INVALID -j DROP'
+    ] %}
+
+{%- if iptables_apply__template_noflush | d(False) | bool %}
+{% set core_rules = core_rules | reverse | map('regex_replace', '^', '-I ') | list %}
+{%- else %}
+{% set core_rules = core_rules | map('regex_replace', '^', '-A ') | list %}
+{%- endif %}
 
 {###############################################################################
   Keep currently applied policies, unless policies are specified. The role
@@ -21,13 +42,13 @@
 #}
 {% if iptables_apply__template_policy.input is defined %}
 :INPUT {{ iptables_apply__template_policy.input }} [0:0]
-{% endif %}
+{% endif -%}
 {% if iptables_apply__template_policy.forward is defined %}
 :FORWARD {{ iptables_apply__template_policy.forward }} [0:0]
-{% endif %}
+{% endif -%}
 {% if iptables_apply__template_policy.output is defined %}
 :OUTPUT {{ iptables_apply__template_policy.output }} [0:0]
-{% endif %}
+{% endif -%}
 
 {###############################################################################
   The core rules, a.k.a. sanity rules.  They are inserted (-I) instead of being
@@ -36,24 +57,11 @@
   but numbered rules don't work as expected with the --noflush option in nft
   implementation (iptables-nft-restore, via alternatives).
 #}
-{% if iptables_apply__template_core|bool %}
-{#
-  There are only 4 userland states: NEW, ESTABLISHED, RELATED and INVALID. That
-  means that any packet that was not caught by the two first rules is NEW, so
-  it's useless to specify this criterion in the next rules.
-#}
--I INPUT -p tcp -m tcp --dport {{ ansible_port | d(22) }} -m comment --comment "SSH" -j ACCEPT
--I INPUT -p tcp -m tcp ! --syn -m comment --comment "bad NEWs" -j DROP
--I INPUT -p tcp -m tcp --sport :1023 -m comment --comment "bad source port" -j DROP
--I INPUT -p udp -m udp --sport :1023 -m comment --comment "bad source port" -j DROP
--I INPUT -p icmp -m comment --comment "ICMP" -j ACCEPT
--I INPUT -i lo -m comment --comment "loopback" -j ACCEPT
--I INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
--I INPUT -m conntrack --ctstate INVALID -j DROP
-
--I OUTPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
--I OUTPUT -m conntrack --ctstate INVALID -j DROP
-{% endif %}
+{%- if iptables_apply__template_core|bool %}
+{% for core_rule in core_rules %}
+{{ core_rule }}
+{% endfor %}
+{% endif -%}
 
 {###############################################################################
   Application-specific rules, generally to **ACCEPT** given port(s) on filter's
@@ -63,9 +71,10 @@
 -A {{ rule.chain | d('INPUT') }} -p {{ rule.protocol | d('tcp') }}
 {%- if ',' in rule.dport|string %} -m multiport --dports {% else %} -m {{ rule.protocol | d('tcp') }} --dport {% endif %}
 {{ rule.dport }} -m comment --comment "{{ rule.name }}" -j {{ rule.jump | d('ACCEPT') }}
-{% endfor %}
+{% endfor -%}
 
 {###############################################################################
   The last line for a given table
 #}
 COMMIT
+# Completed
