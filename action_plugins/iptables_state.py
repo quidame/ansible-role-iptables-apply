@@ -47,9 +47,8 @@ class ActionModule(ActionBase):
         del async_result['ansible_job_id']
         del async_result['finished']
 
-        if 'restored_state' in async_result:
-            if async_result['restored_state'] == async_result['initial_state']:
-                async_result['changed'] = False
+        if async_result.get('restored_state', None) == async_result['initial_state']:
+            async_result['changed'] = False
 
         return async_result
 
@@ -92,6 +91,10 @@ class ActionModule(ActionBase):
 
             # do work!
             result = merge_hash(result, self._execute_module(module_args=module_args, task_vars=task_vars, wrap_async=wrap_async))
+
+            if result.get('invocation', {}).get('module_args'):
+                del result['invocation']['module_args']['_timeout']
+                del result['invocation']['module_args']['_back']
 
             # Then the 3-steps "go ahead or rollback":
             # - reset connection to ensure a persistent one will not be reused
