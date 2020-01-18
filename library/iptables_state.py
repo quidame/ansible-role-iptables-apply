@@ -156,6 +156,9 @@ rollback_complete:
 import re
 import os
 import time
+import tempfile
+import filecmp
+import shutil
 
 from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils._text import to_bytes
@@ -185,74 +188,72 @@ TABLES = dict(
 )
 
 
-def initialize_from_null_state(bin_iptables, table=None):
+def write_state(path, b_lines, validator, changed=False):
+    '''
+    Write given contents to the given path, and return changed status.
+    '''
+    # Populate a temporary file
+    tmpfd, tmpfile = tempfile.mkstemp()
+    with os.fdopen(tmpfd, 'wb') as f:
+        for b_line in b_lines:
+            f.write('%s\n' % b_line)
+
+    # Test it, i.e. ensure it is in good shape (not a oneliner, no litteral '\n'
+    # at EOL, and so on).
+    (rc, out, err) = module.run_command([validator, '--test', tmpfile], check_rc=True)
+
+    # Prepare to copy temporary file to the final destination
+    b_path = to_bytes(path, errors='surrogate_or_strict')
+    if not os.path.exists(b_path):
+        destdir = os.path.dirname(path)
+        b_destdir = to_bytes(destdir, errors='surrogate_or_strict')
+        if b_destdir and not os.path.exists(b_destdir) and not module.check_mode:
+            try:
+                os.makedirs(b_destdir)
+            except Exception as e:
+                module.fail_json(msg='Error creating %s. Error code: %s. Error description: %s' % (b_destdir, e[0], e[1]))
+        changed = True
+
+    elif not filecmp.cmp(b_path, tmpfile):
+        changed = True
+
+    # Do it
+    if not module.check_mode:
+        shutil.copyfile(tmpfile, b_path)
+
+    return changed
+
+
+def initialize_from_null_state(bin_iptables, initcommand, table=None):
     '''
     This ensures iptables-state output is suitable for iptables-restore to roll
     back to it, i.e. iptables-save output is not empty. This also works for the
     iptables-nft-save alternative.
     '''
     if table is None: table = 'filter'
-
     PARTCOMMAND = [bin_iptables, '-t', table, '-P']
 
     for chain in TABLES[table]:
         RESETPOLICY = list(PARTCOMMAND)
         RESETPOLICY.append(chain)
         RESETPOLICY.append('ACCEPT')
-        ( rc, out, err ) = module.run_command(RESETPOLICY, check_rc=True)
-    return True
+        (rc, out, err) = module.run_command(RESETPOLICY, check_rc=True)
+
+    (rc, out, err) = module.run_command(initcommand, check_rc=True)
+    return (rc, out, err)
 
 
-def reformat(string, boolean):
+def string_to_filtered_b_lines(string, counters):
     '''
     Remove timestamps to ensure idempotency between runs. Also remove counters
-    by default.
+    by default. And return the result as a list of bytes.
     '''
-    string = re.sub('((^|\n)# (Generated|Completed)[^\n]*) on [^\n]*', '\\1', string)
-    if not boolean: string = re.sub('\[[0-9]+:[0-9]+\]', '[0:0]', string)
-    string_lines = string.split('\n')
-    while '' in string_lines: string_lines.remove('')
-    return string_lines
-
-
-def writein(filepath, contents):
-    '''
-    Write given contents to the given file, and return old and new checksums.
-    The module currently doesn't manage parent directories (fail if missing)
-    nor file properties (it does, but poorly with os.umask).
-    '''
-    b_filepath = to_bytes(filepath, errors='surrogate_or_strict')
-    old = None
-
-    if os.path.exists(b_filepath):
-        if not os.path.isfile(b_filepath):
-            module.fail_json(msg="Destination %s exists and is not a regular file" % (filepath))
-        if not os.access(b_filepath, os.W_OK):
-            module.fail_json(msg="Desitination %s not writeable" % (filepath))
-        old = module.sha1(filepath)
-    else:
-        dirname = os.path.dirname(b_filepath)
-        if not os.path.exists(dirname):
-            module.fail_json(msg="Destination parent %s not found" % (dirname))
-        if not os.path.isdir(dirname):
-            module.fail_json(msg="Destination parent %s not a directory" % (dirname))
-        if not os.access(dirname, os.W_OK):
-            module.fail_json(msg="Desitination parent %s not writeable" % (dirname))
-
-    try:
-        dest = open(filepath, 'w+')
-        if type(contents) in [str, int, float]:
-            dest.write("%s\n" % (contents))
-
-        elif type(contents) in [list, dict, tuple]:
-            for line in contents:
-                dest.write("%s\n" % (line))
-        dest.close()
-    except:
-        module.fail_json(msg="Unable to write into %s" % (filepath))
-
-    new = module.sha1(filepath)
-    return (old, new)
+    b_string = to_bytes(string, errors='surrogate_or_strict')
+    b_string = re.sub('((^|\n)# (Generated|Completed)[^\n]*) on [^\n]*', '\\1', b_string)
+    if not counters: b_string = re.sub('\[[0-9]+:[0-9]+\]', '[0:0]', b_string)
+    b_lines = b_string.splitlines()
+    while '' in b_lines: b_lines.remove('')
+    return b_lines
 
 
 def main():
@@ -313,18 +314,17 @@ def main():
 
     for chance in (1, 2):
         (rc, stdout, stderr) = module.run_command(INITCOMMAND, check_rc=True)
-        if stdout and ( table is None or len(stdout.split('\n')) > len(TABLES[table]) + 4 ):
-            initial_state = reformat(stdout, counters)
-        elif initialize_from_null_state(bin_iptables, table=table):
-            changed = True
+        if stdout and ( table is None or len(stdout.splitlines()) >= len(TABLES[table]) + 4 ):
+            break
+        else:
+            (rc, stdout, stderr) = initialize_from_null_state(bin_iptables, INITCOMMAND, table=table)
 
-    if not initial_state:
+    initial_state = string_to_filtered_b_lines(stdout, counters)
+    if initial_state is None:
         module.fail_json(msg="Unable to initialize firewall from NULL state.")
 
     if state == 'saved':
-        checksum_old, checksum_new = writein(path, initial_state)
-        if checksum_new != checksum_old:
-            changed = True
+        changed = write_state(path, initial_state, bin_iptables_restore, changed=changed)
 
     if state != 'restored':
         cmd = ' '.join(INITCOMMAND)
@@ -345,7 +345,7 @@ def main():
     MAINCOMMAND.insert(0, bin_iptables_restore)
 
     if _back is not None:
-        garbage = writein(_back, initial_state)
+        garbage = write_state(_back, initial_state, bin_iptables_restore, changed=False)
         BACKCOMMAND = list(MAINCOMMAND)
         BACKCOMMAND.append(_back)
 
@@ -365,7 +365,7 @@ def main():
 
     (rc, stdout, stderr) = module.run_command(MAINCOMMAND, check_rc=True)
     (rc, stdout, stderr) = module.run_command(INITCOMMAND, check_rc=True)
-    restored_state = reformat(stdout, counters)
+    restored_state = string_to_filtered_b_lines(stdout, counters)
     if restored_state != initial_state:
         changed = True
 
@@ -391,7 +391,7 @@ def main():
     #   timeout
     # * task attribute 'poll' equals 0
     #
-    for x in range(_timeout):
+    for x in range(1, _timeout):
         if os.path.exists(_back):
             time.sleep(1)
             continue
@@ -407,7 +407,7 @@ def main():
     # cookie, so we restore initial state from it.
     (rc, stdout, stderr) = module.run_command(BACKCOMMAND, check_rc=True)
     (rc, stdout, stderr) = module.run_command(INITCOMMAND, check_rc=True)
-    backed_state = reformat(stdout, counters)
+    backed_state = string_to_filtered_b_lines(stdout, counters)
 
     os.remove(_back)
 
@@ -415,7 +415,7 @@ def main():
             rollback_complete=(backed_state == initial_state),
             applied=False,
             cmd=cmd,
-            msg="Failed to confirm state restored from %s. Firewall has been rolled back to initial state" % (path),
+            msg="Failed to confirm state restored from %s. Firewall has been rolled back to initial state." % (path),
             initial_state=initial_state,
             restored_state=restored_state)
 
