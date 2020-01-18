@@ -79,7 +79,7 @@ class ActionModule(ActionBase):
             # FUTURE: better to let _execute_module calculate this internally?
             wrap_async = self._task.async_val and not self._connection.has_native_async
 
-            if 'state' in module_args and module_args['state'] == 'restored':
+            if module_args.get('state', None) == 'restored':
                 if not task_async:
                     display.warning(self.MSG_WARNING__NO_ASYNC_IS_NO_ROLLBACK)
                 elif task_poll:
