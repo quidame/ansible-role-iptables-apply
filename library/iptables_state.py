@@ -345,7 +345,7 @@ def main():
     MAINCOMMAND.insert(0, bin_iptables_restore)
 
     if _back is not None:
-        garbage = write_state(_back, initial_state, bin_iptables_restore, changed=False)
+        garbage = write_state(_back, initial_state, bin_iptables_restore)
         BACKCOMMAND = list(MAINCOMMAND)
         BACKCOMMAND.append(_back)
 
@@ -391,7 +391,7 @@ def main():
     #   timeout
     # * task attribute 'poll' equals 0
     #
-    for x in range(1, _timeout):
+    for x in range(_timeout):
         if os.path.exists(_back):
             time.sleep(1)
             continue
@@ -412,7 +412,7 @@ def main():
     os.remove(_back)
 
     module.fail_json(
-            rollback_complete=(backed_state == initial_state),
+            rollback_complete=backed_state==initial_state,
             applied=False,
             cmd=cmd,
             msg="Failed to confirm state restored from %s. Firewall has been rolled back to initial state." % (path),
