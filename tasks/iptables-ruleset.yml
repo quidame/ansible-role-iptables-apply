@@ -62,3 +62,4 @@
     loop_var: iptables_apply_item
   register: iptables_apply__ruleset
   diff: yes
+...

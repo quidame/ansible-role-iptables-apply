@@ -11,3 +11,4 @@
   async: "{{ (iptables_state__state | d() == 'restored') | ternary(ansible_timeout, omit) }}"
   poll:  "{{ (iptables_state__state | d() == 'restored') | ternary(0, omit) }}"
   register: iptables_state__registered
+...

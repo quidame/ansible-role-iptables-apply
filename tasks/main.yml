@@ -35,3 +35,4 @@
 # And finally, ensure the service is started and enabled (or not).
 # This task may be called apart with a 'tasks_from' too.
 - import_tasks: iptables-service.yml
+...
