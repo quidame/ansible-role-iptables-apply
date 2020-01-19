@@ -1,20 +1,21 @@
 # Copyright: (c) 2020, quidame <quidame@poivron.org>
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
-from __future__ import (absolute_import, division, print_function)
+from __future__ import absolute_import, division, print_function
 __metaclass__ = type
 
 import time
 
 from ansible.plugins.action import ActionBase
-from ansible.utils.vars import merge_hash
 from ansible.errors import AnsibleError, AnsibleActionFail, AnsibleConnectionFailure
+from ansible.utils.vars import merge_hash
 from ansible.utils.display import Display
 
 display = Display()
 
 class ActionModule(ActionBase):
 
+    # Keep internal params away from user interactions
     _VALID_ARGS = frozenset(('path', 'state', 'table', 'noflush', 'counters', 'modprobe', 'ip_version'))
     DEFAULT_SUDOABLE = True
 
@@ -23,26 +24,29 @@ class ActionModule(ActionBase):
             "is set to 'restored'. To enable its rollback feature (that needs the "
             "module to run asynchronously on the remote), please set task attribute "
             "'poll' to 0, and 'async' to a value not greater than 'ansible_timeout' "
-            "(recommended, not checked).")
+            "(recommended).")
     MSG_WARNING__NO_ASYNC_IS_NO_ROLLBACK = (
             "Attempts to restore iptables state without rollback in case of mistake "
             "may lead the ansible controller to loose access to the hosts and never "
             "regain it before fixing firewall rules through a serial console, or any "
             "other way except SSH. Please set task attribute 'poll' to 0, and 'async' "
-            "to a value not greater than 'ansible_timeout' (recommended, not checked).")
+            "to a value not greater than 'ansible_timeout' (recommended).")
 
 
-    # Retrieve results of the asynchonous task, and display them in place of
-    # the async wrapper results (those with the ansible_job_id key).
-    def _async_result(self, module_name, module_args, task_vars):
-        async_result = {}
-
-        while int(async_result.get('finished', 0)) != 1:
+    def _async_result(self, module_args, task_vars, timeout):
+        '''
+        Retrieve results of the asynchonous task, and display them in place of
+        the async wrapper results (those with the ansible_job_id key).
+        '''
+        for i in range(int(timeout)):
             async_result = self._execute_module(
-                    module_name=module_name,
+                    module_name='async_status',
                     module_args=module_args,
                     task_vars=task_vars,
                     wrap_async=False)
+            if async_result['finished'] == 1:
+                break
+            time.sleep(1)
 
         del async_result['ansible_job_id']
         del async_result['finished']
@@ -56,7 +60,7 @@ class ActionModule(ActionBase):
     def run(self, tmp=None, task_vars=None):
 
         # individual modules might disagree but as the generic the action plugin, pass at this point.
-        self._supports_check_mode = False
+        self._supports_check_mode = True
         self._supports_async = True
 
         result = super(ActionModule, self).run(tmp, task_vars)
@@ -84,10 +88,30 @@ class ActionModule(ActionBase):
                 elif task_poll:
                     raise AnsibleActionFail(self.MSG_ERROR__ASYNC_AND_POLL_NOT_ZERO)
                 else:
+                    # BEGIN snippet from async_status action plugin
+                    env_async_dir = [e for e in self._task.environment if
+                                     "ANSIBLE_ASYNC_DIR" in e]
+                    if len(env_async_dir) > 0:
+                        # for backwards compatibility we need to get the dir from
+                        # ANSIBLE_ASYNC_DIR that is defined in the environment. This is
+                        # deprecated and will be removed in favour of shell options
+                        async_dir = env_async_dir[0]['ANSIBLE_ASYNC_DIR']
+
+                        msg = "Setting the async dir from the environment keyword " \
+                              "ANSIBLE_ASYNC_DIR is deprecated. Set the async_dir " \
+                              "shell option instead"
+                        display.deprecated(msg, "2.12")
+                    else:
+                        # inject the async directory based on the shell option into the
+                        # module args
+                        async_dir = self.get_shell_option('async_dir', default="~/.ansible_async")
+                    ### END snippet from async_status action plugin
+
                     # Bind the loop max duration to the same value on both
                     # remote and local sides, and set a backup file path.
                     module_args['_timeout'] = task_async
-                    module_args['_back'] = '/run/iptables.state'
+                    module_args['_back'] = '%s/iptables.state' % async_dir
+
 
             # do work!
             result = merge_hash(result, self._execute_module(module_args=module_args, task_vars=task_vars, wrap_async=wrap_async))
@@ -108,8 +132,10 @@ class ActionModule(ActionBase):
                     display.warning("Connection plugin does not allow to reset the connection.")
 
                 confirm_cmd = 'rm %s' % module_args['_back']
+                remaining_time = int(module_args['_timeout'])
                 for x in range(int(module_args['_timeout'])):
                     time.sleep(1)
+                    remaining_time -= 1
                     # - AnsibleConnectionFailure covers rejected requests (i.e.
                     #   by rules with '--jump REJECT')
                     # - ansible_timeout is able to cover dropped requests (due
@@ -125,27 +151,8 @@ class ActionModule(ActionBase):
                 if async_status_args['jid'] is None:
                     raise AnsibleActionFail("Unable to get 'ansible_job_id'.")
 
-                # BEGIN snippet from async_status action plugin
-                env_async_dir = [e for e in self._task.environment if
-                                 "ANSIBLE_ASYNC_DIR" in e]
-                if len(env_async_dir) > 0:
-                    # for backwards compatibility we need to get the dir from
-                    # ANSIBLE_ASYNC_DIR that is defined in the environment. This is
-                    # deprecated and will be removed in favour of shell options
-                    async_dir = env_async_dir[0]['ANSIBLE_ASYNC_DIR']
-
-                    msg = "Setting the async dir from the environment keyword " \
-                          "ANSIBLE_ASYNC_DIR is deprecated. Set the async_dir " \
-                          "shell option instead"
-                    display.deprecated(msg, "2.12")
-                else:
-                    # inject the async directory based on the shell option into the
-                    # module args
-                    async_dir = self.get_shell_option('async_dir', default="~/.ansible_async")
-                ### END snippet from async_status action plugin
-
                 async_status_args['_async_dir'] = async_dir
-                result = self._async_result('async_status', async_status_args, task_vars)
+                result = self._async_result(async_status_args, task_vars, remaining_time)
 
                 async_status_args['mode'] = 'cleanup'
                 garbage = self._execute_module(
