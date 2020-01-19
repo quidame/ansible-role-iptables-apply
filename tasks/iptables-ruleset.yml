@@ -38,7 +38,8 @@
     line: "-A {{
       iptables_apply_item.chain | d('INPUT') }} -p {{
       iptables_apply_item.protocol | d('tcp') }} -m {{ 'multiport --dports %s' %
-      iptables_apply_item.dport if ',' in iptables_apply_item.dport|string else '%s --dport %s' % (
+      iptables_apply_item.dport if ',' in
+      iptables_apply_item.dport | string else '%s --dport %s' % (
       iptables_apply_item.protocol | d('tcp'),
       iptables_apply_item.dport) }} -m comment --comment {{
       iptables_apply_item.name | regex_replace('^|$', '\"') if
