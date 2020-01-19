@@ -261,7 +261,7 @@ def main():
     global module
 
     module = AnsibleModule(
-        supports_check_mode=False,
+        supports_check_mode=True,
         argument_spec=dict(
             path=dict(type='path'),
             state=dict(type='str', choices=['saved', 'restored']),
@@ -414,8 +414,8 @@ def main():
     module.fail_json(
             rollback_complete=backed_state==initial_state,
             applied=False,
-            cmd=cmd,
             msg="Failed to confirm state restored from %s. Firewall has been rolled back to initial state." % (path),
+            cmd=cmd,
             initial_state=initial_state,
             restored_state=restored_state)
 
