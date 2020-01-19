@@ -67,9 +67,12 @@
     loop_var: iptables_apply_item
 
 
-- import_tasks: iptables-persist.yml
+# Save current state of the firewall on the disk (file in /etc).
+- name: "confirm current ruleset as persistent"
+  iptables_state:
+    state: saved
+    path: "{{ iptables_apply__service_ruleset }}"
   when:
-    - iptables_apply__ruleset is changed
     - iptables_apply__persist | bool
 
 
