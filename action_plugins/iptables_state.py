@@ -116,6 +116,7 @@ class ActionModule(ActionBase):
             # do work!
             result = merge_hash(result, self._execute_module(module_args=module_args, task_vars=task_vars, wrap_async=wrap_async))
 
+            # Remove internal params from results when not used
             if result.get('invocation', {}).get('module_args'):
                 del result['invocation']['module_args']['_timeout']
                 del result['invocation']['module_args']['_back']
