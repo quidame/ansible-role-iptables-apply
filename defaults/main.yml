@@ -230,3 +230,4 @@ iptables_apply__flush: iptables_flush.j2
 # keywords. Defaults to 'filter'.
 #
 iptables_apply__flush_tables: filter
+...

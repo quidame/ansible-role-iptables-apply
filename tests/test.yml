@@ -1,7 +1,15 @@
 # Play the role as many times as needed to test every action and at least one
 # ruleset that leads to roll back to the last one.  This playbook should never
-# end up in `failed` nor `unreachable` states.  This is why we never use the
-# `REJECT` target.  Triggered rollbacks are handled in blocks.
+# end up in `failed` nor `unreachable` states.  Triggered (expected) rollbacks
+# are handled in block/rescue tasks.
+#
+# Examples:
+#
+# ansible-playbook playbook.yml
+# ansible-playbook playbook.yml --tags append,insert
+# ansible-playbook playbook.yml --tags idempotency
+# ansible-playbook playbook.yml --tags rollback
+# ansible-playbook playbook.yml --skip-tags init -e upper_timeout=30
 ---
 ################################################################################
 - name: "00. PREPARE THE FIELD"
@@ -52,7 +60,7 @@
         iptables_apply__path_buffer: "/run/iptables.apply"
         # Will be incrementend for each played test
         number: 1
-        total: 21
+        total: 22
 
 
 ################################################################################
@@ -325,6 +333,7 @@
           - iptables_state__registered is not changed
           - iptables_apply__restored is not changed
           - iptables_apply__ruleset is not changed
+        quiet: yes
 
     - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/05): IDEMPOTENCY OF ACTION 'TEMPLATE'"
       set_fact:
@@ -356,6 +365,7 @@
               - iptables_apply__ruleset is changed
               - iptables_apply__restored.applied is defined
               - not iptables_apply__restored.applied
+            quiet: yes
           register: rollback_template
 
     - name: "fail if role succeeded"
@@ -489,6 +499,7 @@
           - iptables_state__registered is not changed
           - iptables_apply__restored is not changed
           - iptables_apply__ruleset is not changed
+        quiet: yes
 
     - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/09): IDEMPOTENCY OF ACTION 'APPEND'"
       set_fact:
@@ -506,6 +517,8 @@
   tags:
     - append
     - rollback
+    - reject
+    - ssh
 
   roles:
     - role: iptables_apply
@@ -527,6 +540,7 @@
               - iptables_apply__ruleset is changed
               - iptables_apply__restored.applied is defined
               - not iptables_apply__restored.applied
+            quiet: yes
           register: rollback_append
 
     - name: "fail if role succeeded"
@@ -634,6 +648,7 @@
           - iptables_state__registered is not changed
           - iptables_apply__restored is not changed
           - iptables_apply__ruleset is not changed
+        quiet: yes
 
     - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/12): IDEMPOTENCY OF ACTION 'INSERT'"
       set_fact:
@@ -651,6 +666,8 @@
   tags:
     - insert
     - rollback
+    - reject
+    - ssh
 
   tasks:
     - name: "test rollback after bad 'insert'"
@@ -660,7 +677,7 @@
           vars:
             iptables_apply__action: insert
             iptables_apply__rules:
-              - "{{ rules_ssh[0] | combine({'jump':'DROP'}) }}"
+              - "{{ rules_ssh[0] | combine({'jump':'REJECT'}) }}"
       rescue:
         - name: "check expected error"
           assert:
@@ -668,6 +685,7 @@
               - iptables_apply__ruleset is changed
               - iptables_apply__restored.applied is defined
               - not iptables_apply__restored.applied
+            quiet: yes
           register: rollback_insert
 
     - name: "fail if role succeeded"
@@ -777,6 +795,7 @@
           - iptables_state__registered is not changed
           - iptables_apply__restored is not changed
           - iptables_apply__ruleset is not changed
+        quiet: yes
 
     - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/15): IDEMPOTENCY OF ACTION 'DELETE'"
       set_fact:
@@ -794,6 +813,7 @@
   tags:
     - delete
     - rollback
+    - ssh
 
   roles:
     - role: iptables_apply
@@ -814,6 +834,7 @@
               - iptables_apply__ruleset is changed
               - iptables_apply__restored.applied is defined
               - not iptables_apply__restored.applied
+            quiet: yes
           register: rollback_delete
 
     - name: "fail if role succeeded"
@@ -862,19 +883,67 @@
       loop_control:
         loop_var: rule
 
-    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/17): NO FLUSH OF ACTION 'TEMPLATE'"
+    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/17): NOFLUSH OF ACTION 'TEMPLATE'"
       set_fact:
         number: "{{ number|int + 1 }}"
 
 
 ################################################################################
-- name: "18. TEST ROLLBACK WHEN CHANGING POLICY"
+- name: "18. TEST ROLLBACK WITH INPUT POLICY DROP"
   hosts: tests
   gather_facts: no
   become: yes
   tags:
     - rollback
     - policy
+    - input
+
+  tasks:
+    - name: "test rollback after bad policy"
+      block:
+        - name: "remove iptables buffer"
+          file:
+            path: "{{ iptables_apply__path_buffer }}"
+            state: absent
+
+        - include_role:
+            name: iptables_apply
+          vars:
+            iptables_apply__template_once: no
+            iptables_apply__template_core: no
+            iptables_apply__template_policy:
+              input: DROP
+              forward: ACCEPT
+              output: ACCEPT
+      rescue:
+        - name: "check expected error"
+          assert:
+            that:
+              - iptables_apply__ruleset is changed
+              - iptables_apply__restored.applied is defined
+              - not iptables_apply__restored.applied
+            quiet: yes
+          register: rollback_policy_drop_input
+
+    - name: "fail if role succeeded"
+      fail:
+        msg: "There is some unexpected issue in rollback feature"
+      failed_when: rollback_policy_drop_input is undefined
+
+    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/18): ROLLBACK WITH INPUT POLICY DROP"
+      set_fact:
+        number: "{{ number|int + 1 }}"
+
+
+################################################################################
+- name: "19. TEST ROLLBACK WITH OUTPUT POLICY DROP"
+  hosts: tests
+  gather_facts: no
+  become: yes
+  tags:
+    - rollback
+    - policy
+    - output
 
   tasks:
     - name: "test rollback after bad policy"
@@ -900,20 +969,21 @@
               - iptables_apply__ruleset is changed
               - iptables_apply__restored.applied is defined
               - not iptables_apply__restored.applied
-          register: rollback_policy
+            quiet: yes
+          register: rollback_policy_drop_output
 
     - name: "fail if role succeeded"
       fail:
         msg: "There is some unexpected issue in rollback feature"
-      failed_when: rollback_policy is undefined
+      failed_when: rollback_policy_drop_output is undefined
 
-    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/18): ROLLBACK WITH A BAD POLICY"
+    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/19): ROLLBACK WITH OUTPUT POLICY DROP"
       set_fact:
         number: "{{ number|int + 1 }}"
 
 
 ################################################################################
-- name: "19. TEST ROLLBACK WITH LOWER TIMEOUT"
+- name: "20. TEST ROLLBACK WITH LOWER TIMEOUT"
   hosts: tests
   gather_facts: no
   become: yes
@@ -946,6 +1016,7 @@
               - iptables_apply__ruleset is changed
               - iptables_apply__restored.applied is defined
               - not iptables_apply__restored.applied
+            quiet: yes
           register: rollback_timeout_lower
 
     - name: "fail if role succeeded"
@@ -953,13 +1024,13 @@
         msg: "There is some unexpected issue in rollback feature"
       failed_when: rollback_timeout_lower is undefined
 
-    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/19): ROLLBACK WITH LOWER TIMEOUT ({{ iptables_apply__rollback_timeout }}s)"
+    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/20): ROLLBACK WITH LOWER TIMEOUT ({{ iptables_apply__rollback_timeout }}s)"
       set_fact:
         number: "{{ number|int + 1 }}"
 
 
 ################################################################################
-- name: "20. TEST ROLLBACK WITH UPPER TIMEOUT"
+- name: "21. TEST ROLLBACK WITH UPPER TIMEOUT"
   hosts: tests
   gather_facts: no
   become: yes
@@ -985,6 +1056,9 @@
           vars:
             iptables_apply__template_once: no
             iptables_apply__template_core: no
+            iptables_apply__template_policy: {}
+            iptables_apply__template_rules:
+              - "{{ rules_ssh[0] | combine({'jump':'%s' % upper_timeout_jump | d('REJECT')}) }}"
       rescue:
         - name: "check expected error"
           assert:
@@ -992,6 +1066,7 @@
               - iptables_apply__ruleset is changed
               - iptables_apply__restored.applied is defined
               - not iptables_apply__restored.applied
+            quiet: yes
           register: rollback_timeout_upper
 
     - name: "fail if role succeeded"
@@ -999,7 +1074,7 @@
         msg: "There is some unexpected issue in rollback feature"
       failed_when: rollback_timeout_upper is undefined
 
-    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/20): ROLLBACK WITH UPPER TIMEOUT ({{ iptables_apply__rollback_timeout }}s)"
+    - name: "SUCCESSFULLY PASSED TEST {{ '%02d' % number|int }} (/21): ROLLBACK WITH UPPER TIMEOUT ({{ iptables_apply__rollback_timeout }}s)"
       set_fact:
         number: "{{ number|int + 1 }}"
 
@@ -1008,7 +1083,7 @@
 # Ensure it is possible to update several rules by playing the role only once,
 # even when neither the 'name' nor the 'dport' match between an old rule and a
 # new rule.
-- name: "21. TEST RULE UPDATE BY ACTION 'APPEND'"
+- name: "22. TEST RULE UPDATE BY ACTION 'APPEND'"
   hosts: tests
   gather_facts: no
   become: yes
@@ -1070,7 +1145,7 @@
       loop_control:
         loop_var: rule
 
-    - name: "SUCCESSFULLY PASSED TEST  {{ '%02d' % number|int }} (/21): UPDATE OF ACTION 'APPEND'"
+    - name: "SUCCESSFULLY PASSED TEST  {{ '%02d' % number|int }} (/22): UPDATE BY ACTION 'APPEND'"
       set_fact:
         number: "{{ number|int + 1 }}"
 

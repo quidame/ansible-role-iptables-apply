@@ -11,3 +11,4 @@
       state: "{{ 'stopped' if iptables_apply__action == 'flush' or not iptables_apply__service_started|bool else 'started' }}"
   loop_control:
     loop_var: iptables_apply_item
+...

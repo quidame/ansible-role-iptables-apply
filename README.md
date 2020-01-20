@@ -45,9 +45,7 @@ This role comes with the following features:
   parameters.
 
 This role ships a custom ansible module `iptables_state` to manage saving and
-restoring firewall state to/from a file. TODO: a matching action plugin for
-better rollback management (including the connection reset and the removal of
-the cookie).
+restoring firewall state to/from a file.
 
 Requirements
 ------------
@@ -209,8 +207,9 @@ iptables_apply__template_core: true
 ```
 
 * The default policy to apply for each chain of the filter table.  If a policy
-  is undefined in this variable, then it will not be changed on the target. For
-  example, to keep all current policies: `iptables_apply__template_policy: {}`
+  is undefined in this variable, then it will be changed to `ACCEPT` on the
+  target. For example, to blank all current policies:
+  `iptables_apply__template_policy: {}`
 
 ```yaml
 iptables_apply__template_policy:
@@ -231,10 +230,12 @@ iptables_apply__template_once: true
 
 * This variable defines a string that should be found in the `iptables-save`
   output to know/decide if the templated ruleset is already in use. Defaults
-  to the rule dropping TCP packets in state NEW and not coming with only the
-  `SYN` flag:
+  to the rule dropping TCP packets in state `NEW` and not coming with only the
+  `SYN` flag. NOTE that there is a short writing of this rule, but the output
+  is always the same:
 
 ```yaml
+# short writing: '-A INPUT -p tcp -m tcp ! --syn -m comment --comment "bad NEWs" -j DROP'
 iptables_apply__template_mark: '-A INPUT -p tcp -m tcp ! --tcp-flags FIN,SYN,RST,ACK SYN -m comment --comment "bad NEWs" -j DROP'
 ```
 
@@ -255,6 +256,7 @@ iptables_apply__flush: iptables_flush.j2
   keywords. Defaults to `filter`.
 
 ```yaml
+# choices: all, filter, nat, mangle, raw, security
 iptables_apply__flush_tables: filter
 ```
 
@@ -369,7 +371,10 @@ Manage persistence of the current ruleset:
   tasks:
     - include_role:
         name: iptables_apply
-        tasks_from: iptables-persist.yml
+        tasks_from: iptables_state.yml
+      vars:
+	iptables_state__state: saved
+	iptables_state__path: /etc/sysconfig/iptables
 ```
 
 Or manage the service (for example disable it and keep it started):
@@ -408,7 +413,7 @@ To make use of this role as a galaxy role, put the following lines in
 ```yaml
 - name: iptables_apply
   src: https://github.com/quidame/ansible-role-iptables_apply.git
-  version: 4.0.0
+  version: 4.1.0
   scm: git
 ```
 
