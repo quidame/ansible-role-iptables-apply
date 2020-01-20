@@ -161,7 +161,7 @@ import filecmp
 import shutil
 
 from ansible.module_utils.basic import AnsibleModule
-from ansible.module_utils._text import to_bytes
+from ansible.module_utils._text import to_bytes, to_native
 
 
 IPTABLES = dict(
@@ -188,7 +188,7 @@ TABLES = dict(
 )
 
 
-def write_state(path, b_lines, validator, changed=False):
+def write_state(b_path, b_lines, validator, changed=False):
     '''
     Write given contents to the given path, and return changed status.
     '''
@@ -203,18 +203,17 @@ def write_state(path, b_lines, validator, changed=False):
     (rc, out, err) = module.run_command([validator, '--test', tmpfile], check_rc=True)
 
     # Prepare to copy temporary file to the final destination
-    b_path = to_bytes(path, errors='surrogate_or_strict')
     if not os.path.exists(b_path):
-        destdir = os.path.dirname(path)
-        b_destdir = to_bytes(destdir, errors='surrogate_or_strict')
+        b_destdir = os.path.dirname(b_path)
+        destdir = to_native(b_destdir, errors='surrogate_or_strict')
         if b_destdir and not os.path.exists(b_destdir) and not module.check_mode:
             try:
                 os.makedirs(b_destdir)
             except Exception as e:
-                module.fail_json(msg='Error creating %s. Error code: %s. Error description: %s' % (b_destdir, e[0], e[1]))
+                module.fail_json(msg='Error creating %s. Error code: %s. Error description: %s' % (destdir, e[0], e[1]))
         changed = True
 
-    elif not filecmp.cmp(b_path, tmpfile):
+    elif not filecmp.cmp(tmpfile, b_path):
         changed = True
 
     # Do it
@@ -323,8 +322,11 @@ def main():
     if initial_state is None:
         module.fail_json(msg="Unable to initialize firewall from NULL state.")
 
+    if path is not None:
+        b_path = to_bytes(path, errors='surrogate_or_strict')
+
     if state == 'saved':
-        changed = write_state(path, initial_state, bin_iptables_restore, changed=changed)
+        changed = write_state(b_path, initial_state, bin_iptables_restore, changed=changed)
 
     if state != 'restored':
         cmd = ' '.join(INITCOMMAND)
@@ -333,7 +335,6 @@ def main():
     #
     # All remaining code is for state=restored
     #
-    b_path = to_bytes(path, errors='surrogate_or_strict')
     if not os.path.exists(b_path):
         module.fail_json(msg="Source %s not found" % (path))
     if not os.path.isfile(b_path):
@@ -345,7 +346,8 @@ def main():
     MAINCOMMAND.insert(0, bin_iptables_restore)
 
     if _back is not None:
-        garbage = write_state(_back, initial_state, bin_iptables_restore)
+        b_back = to_bytes(_back, errors='surrogate_or_strict')
+        garbage = write_state(b_back, initial_state, bin_iptables_restore)
         BACKCOMMAND = list(MAINCOMMAND)
         BACKCOMMAND.append(_back)
 
@@ -392,7 +394,7 @@ def main():
     # * task attribute 'poll' equals 0
     #
     for x in range(_timeout):
-        if os.path.exists(_back):
+        if os.path.exists(b_back):
             time.sleep(1)
             continue
         module.exit_json(
@@ -406,10 +408,10 @@ def main():
     # the action plugin (i.e. on the controller) was unable to remove the backup
     # cookie, so we restore initial state from it.
     (rc, stdout, stderr) = module.run_command(BACKCOMMAND, check_rc=True)
+    os.remove(b_back)
+
     (rc, stdout, stderr) = module.run_command(INITCOMMAND, check_rc=True)
     backed_state = string_to_filtered_b_lines(stdout, counters)
-
-    os.remove(_back)
 
     module.fail_json(
             rollback_complete=backed_state==initial_state,
