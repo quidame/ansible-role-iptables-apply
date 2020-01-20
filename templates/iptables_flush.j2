@@ -1,9 +1,7 @@
-# {{ ansible_managed }}
-# role: {{ role_name }}
-# {{ iptables_apply__action }}
+# {{ ansible_managed }} (flush)
 
 {#-
-  This is a template to flush iptables entirely or partially, in a per-table
+  This is a template to flush iptables entirely or partially, on a per-table
   basis. The templating is controlled using the following variables:
 
   iptables_apply__action: flush
@@ -13,7 +11,7 @@
   The variable `iptables_apply__flush_tables` accepts either a single keyword
   (a table name among 'filter', 'mangle', 'nat', 'raw' and 'security', or 'all')
   or a list of these keywords. Keywords are not checked by ansible itself before
-  templating, but iptables-restore will do in the `validate` parameter.
+  templating, but iptables-restore will do.
 
   ## Examples
 
@@ -57,10 +55,10 @@
 {% else %}
 {% set chains = [] %}
 {% endif %}
-
 *{{ table }}
 {% for chain in chains %}
 :{{ chain }} ACCEPT [0:0]
 {% endfor %}
 COMMIT
 {% endfor %}
+# Completed

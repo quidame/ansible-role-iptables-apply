@@ -1,5 +1,20 @@
 # iptables_apply
 
+## [4.1.0] 2020-01-20
+### Added
+- Role assertions (ansible and OS compatibility)
+- Test cases about rollbacks, playing with timeouts and DROP or REJECT.
+
+### Changed
+- Convert loop `while` -> `for` based on the timeout to retrieve async result.
+- Move `async_dir` search/compute above and use it to build the path of the
+  temporary backup/cookie.
+- Remove internal params from results when not used.
+- Use ansible way to write into the destination file.
+- Use bytes when interacting with filesystem.
+- Rewrite template for better output formats.
+
+
 ## [4.0.0] 2020-01-10
 ### Added
 - Action plugin `iptables_state`: manage the connection reset and the rollback

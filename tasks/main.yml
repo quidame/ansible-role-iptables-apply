@@ -1,8 +1,12 @@
 ---
+# Check role requirements
+- import_tasks: assertions.yml
+
+
 # Do all the stuff using a template, or just delete/append/insert/update rules.
 # Do not ever try to modify system state (iptables state) nor system files (in
 # /etc) at this step.  All actions are performed against a temporary file, the
-# 'buffer' (that is a copy of the 'backup', all created above).
+# 'buffer'.
 - import_tasks: "rules-{{ iptables_apply__action }}.yml"
 
 
@@ -31,3 +35,4 @@
 # And finally, ensure the service is started and enabled (or not).
 # This task may be called apart with a 'tasks_from' too.
 - import_tasks: iptables-service.yml
+...

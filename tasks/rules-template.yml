@@ -18,3 +18,4 @@
   when:
     - ( not iptables_apply__template_once | bool ) or
       ( not iptables_apply__template_mark in iptables_state__registered.initial_state )
+...
