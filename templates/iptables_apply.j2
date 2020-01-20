@@ -68,9 +68,16 @@
   **INPUT** chain and **tcp** protocol.
 #}
 {% for rule in iptables_apply__template_rules %}
--A {{ rule.chain | d('INPUT') }} -p {{ rule.protocol | d('tcp') }}
-{%- if ',' in rule.dport|string %} -m multiport --dports {% else %} -m {{ rule.protocol | d('tcp') }} --dport {% endif %}
-{{ rule.dport }} -m comment --comment "{{ rule.name }}" -j {{ rule.jump | d('ACCEPT') }}
+-A {{
+    rule.chain | d('INPUT') }} -p {{
+    rule.protocol | d('tcp') }} -m {{ 'multiport --dports' if ',' in
+    rule.dport | string else '%s --dport' %
+    rule.protocol | d('tcp') }} {{
+    rule.dport }} -m comment --comment {{
+    rule.name | regex_replace('^|$', '\"') if
+    rule.name | replace('-','_') | wordcount != 1 else
+    rule.name }} -j {{
+    rule.jump | d('ACCEPT') }}
 {% endfor -%}
 
 {###############################################################################
