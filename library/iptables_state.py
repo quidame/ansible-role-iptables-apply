@@ -89,6 +89,20 @@ options:
         If not specified, output includes all active tables.
     type: str
     choices: [ filter, nat, mangle, raw, security ]
+  _timeout:
+    description:
+      - Internal parameter passed in to the module by its action plugin.
+      - Delay, in seconds, before rolling back to the previous rules if the
+        action plugin is unable to remove the backup/cookie storing these rules.
+      - Gets the same value than C(async) task attribute.
+    type: int
+  _back:
+    description:
+      - Internal parameter passed in to the module by its action plugin.
+      - Path of the backup/cookie storing rules to restore if the action plugin
+        is unable to remove it.
+      - Gets a value built from C(async_dir).
+    type: path
 '''
 
 EXAMPLES = r'''
