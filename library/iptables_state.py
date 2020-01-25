@@ -251,7 +251,7 @@ def string_to_filtered_b_lines(string, counters):
     b_string = to_bytes(string, errors='surrogate_or_strict')
     b_string = re.sub('((^|\n)# (Generated|Completed)[^\n]*) on [^\n]*', '\\1', b_string)
     if not counters:
-        b_string = re.sub('\[[0-9]+:[0-9]+\]', '[0:0]', b_string)
+        b_string = re.sub('[[][0-9]+:[0-9]+[]]', '[0:0]', b_string)
     b_lines = b_string.splitlines()
     while '' in b_lines:
         b_lines.remove('')
@@ -317,8 +317,7 @@ def main():
         (rc, stdout, stderr) = module.run_command(INITCOMMAND, check_rc=True)
         if stdout and (table is None or len(stdout.splitlines()) >= len(TABLES[table]) + 4):
             break
-        else:
-            (rc, stdout, stderr) = initialize_from_null_state(bin_iptables, INITCOMMAND, table=table)
+        (rc, stdout, stderr) = initialize_from_null_state(bin_iptables, INITCOMMAND, table=table)
 
     initial_state = string_to_filtered_b_lines(stdout, counters)
     if initial_state is None:
