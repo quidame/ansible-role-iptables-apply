@@ -1,5 +1,12 @@
 # iptables_apply
 
+## [unreleased]
+### Fixed
+- 'ansible-test sanity' errors
+
+### Added
+- DOCUMENTATION.requirements
+
 ## [4.1.0] 2020-01-20
 ### Added
 - Role assertions (ansible and OS compatibility)
