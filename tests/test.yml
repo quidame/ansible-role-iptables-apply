@@ -12,7 +12,7 @@
 # ansible-playbook playbook.yml --skip-tags init -e upper_timeout=30
 ---
 ################################################################################
-- name: "00. PREPARE THE FIELD"
+- name: "00. PREPARE THE FIELD"                                             #{{{1
   hosts: tests
   become: yes
   tags: always
@@ -64,7 +64,7 @@
 
 
 ################################################################################
-- name: "01. TEST INITIALIZATION FROM NULL STATE WITH NO TABLE"
+- name: "01. TEST INITIALIZATION FROM NULL STATE WITH NO TABLE"             #{{{1
   hosts: tests
   gather_facts: no
   become: yes
@@ -126,7 +126,7 @@
 
 
 ################################################################################
-- name: "02. TEST INITIALIZATION FROM NULL STATE WITH TABLE FILTER"
+- name: "02. TEST INITIALIZATION FROM NULL STATE WITH TABLE FILTER"         #{{{1
   hosts: tests
   gather_facts: no
   become: yes
@@ -199,7 +199,7 @@
 
 
 ################################################################################
-- name: "03. TEST ACTION 'TEMPLATE'"
+- name: "03. TEST ACTION 'TEMPLATE'"                                        #{{{1
   hosts: tests
   gather_facts: no
   become: yes
@@ -257,7 +257,7 @@
 
 ################################################################################
 # Ensure the parameter that forces to reapply the template is working.
-- name: "04. TEST OVERWRITE OF ACTION 'TEMPLATE'"
+- name: "04. TEST OVERWRITE OF ACTION 'TEMPLATE'"                           #{{{1
   hosts: tests
   gather_facts: no
   become: yes
@@ -305,7 +305,7 @@
 
 
 ################################################################################
-- name: "05. TEST INDEMPOTENCY OF ACTION 'TEMPLATE'"
+- name: "05. TEST INDEMPOTENCY OF ACTION 'TEMPLATE'"                        #{{{1
   hosts: tests
   gather_facts: no
   become: yes
@@ -342,7 +342,7 @@
 
 ################################################################################
 # Ensure the most expected feature is working fine.
-- name: "06. TEST ROLLBACK FOR ACTION 'TEMPLATE'"
+- name: "06. TEST ROLLBACK FOR ACTION 'TEMPLATE'"                           #{{{1
   hosts: tests
   gather_facts: no
   become: yes
@@ -379,7 +379,7 @@
 
 
 ################################################################################
-- name: "07. TEST ACTION 'FLUSH'"
+- name: "07. TEST ACTION 'FLUSH'"                                           #{{{1
   hosts: tests
   gather_facts: no
   become: yes
@@ -412,7 +412,7 @@
 
 
 ################################################################################
-- name: "08. TEST ACTION 'APPEND'"
+- name: "08. TEST ACTION 'APPEND'"                                          #{{{1
   hosts: tests
   gather_facts: no
   become: yes
@@ -465,7 +465,7 @@
 # always marked as changed, but the role doesn't attempt to apply the buffered
 # ruleset if it didn't changed.  This sequence also ensures that actions adding
 # rules (`append`, `insert`) are idempotent between them too.
-- name: "09. TEST INDEMPOTENCY OF ACTION 'APPEND'"
+- name: "09. TEST INDEMPOTENCY OF ACTION 'APPEND'"                          #{{{1
   hosts: tests
   gather_facts: no
   become: yes
@@ -510,7 +510,7 @@
 # Ensure the rollback feature works for every action.  Note that at this step,
 # there is no ssh-specific passing rule but a rule for ports 20:23.  The table
 # needs to be flushed before testing action 'append'.
-- name: "10. TEST ROLLBACK FOR ACTION 'APPEND'"
+- name: "10. TEST ROLLBACK FOR ACTION 'APPEND'"                             #{{{1
   hosts: tests
   gather_facts: no
   become: yes
@@ -558,7 +558,7 @@
 # service status here, but only the fact that a rule has been added or removed.
 # This sequence is a junglery that removes ssh-specific passing rule with no
 # error because another one does the job.
-- name: "11. TEST ACTION 'INSERT'"
+- name: "11. TEST ACTION 'INSERT'"                                          #{{{1
   hosts: tests
   gather_facts: no
   become: yes
@@ -614,7 +614,7 @@
 # always marked as changed, but the role doesn't attempt to apply the buffered
 # ruleset if it didn't changed.  This sequence also ensures that actions adding
 # rules (`append`, `insert`) are idempotent between them too.
-- name: "12. TEST INDEMPOTENCY OF ACTION 'INSERT'"
+- name: "12. TEST INDEMPOTENCY OF ACTION 'INSERT'"                          #{{{1
   hosts: tests
   gather_facts: no
   become: yes
@@ -659,7 +659,7 @@
 # Ensure the rollback feature works for every action.  Note that at this step,
 # there is no ssh-specific passing rule but a rule for ports 20:23.  The table
 # needs to be flushed before testing action 'append'.
-- name: "13. TEST ROLLBACK FOR ACTION 'INSERT'"
+- name: "13. TEST ROLLBACK FOR ACTION 'INSERT'"                             #{{{1
   hosts: tests
   gather_facts: no
   become: yes
@@ -703,7 +703,7 @@
 # service status here, but only the fact that a rule has been added or removed.
 # This sequence is a junglery that removes ssh-specific passing rule with no
 # error because another one does the job.
-- name: "14. TEST ACTION 'DELETE'"
+- name: "14. TEST ACTION 'DELETE'"                                          #{{{1
   hosts: tests
   gather_facts: no
   become: yes
@@ -761,7 +761,7 @@
 # always marked as changed, but the role doesn't attempt to apply the buffered
 # ruleset if it didn't changed.  This sequence also ensures that actions adding
 # rules (`append`, `insert`) are idempotent between them too.
-- name: "15. TEST INDEMPOTENCY OF ACTION 'DELETE'"
+- name: "15. TEST INDEMPOTENCY OF ACTION 'DELETE'"                          #{{{1
   hosts: tests
   gather_facts: no
   become: yes
@@ -806,7 +806,7 @@
 # Ensure the rollback feature works for every action.  Note that at this step,
 # there is no ssh-specific passing rule but a rule for ports 20:23.  The table
 # needs to be flushed before testing action 'append'.
-- name: "16. TEST ROLLBACK FOR ACTION 'DELETE'"
+- name: "16. TEST ROLLBACK FOR ACTION 'DELETE'"                             #{{{1
   hosts: tests
   gather_facts: no
   become: yes
@@ -850,7 +850,7 @@
 ################################################################################
 # Ensure the noflush option works, i.e. templated rules are applied and initial
 # rules are still there.
-- name: "17. TEST OPTION NOFLUSH OF ACTION 'TEMPLATE'"
+- name: "17. TEST OPTION NOFLUSH OF ACTION 'TEMPLATE'"                      #{{{1
   hosts: tests
   gather_facts: no
   become: yes
@@ -889,7 +889,7 @@
 
 
 ################################################################################
-- name: "18. TEST ROLLBACK WITH INPUT POLICY DROP"
+- name: "18. TEST ROLLBACK WITH INPUT POLICY DROP"                          #{{{1
   hosts: tests
   gather_facts: no
   become: yes
@@ -936,7 +936,7 @@
 
 
 ################################################################################
-- name: "19. TEST ROLLBACK WITH OUTPUT POLICY DROP"
+- name: "19. TEST ROLLBACK WITH OUTPUT POLICY DROP"                         #{{{1
   hosts: tests
   gather_facts: no
   become: yes
@@ -983,7 +983,7 @@
 
 
 ################################################################################
-- name: "20. TEST ROLLBACK WITH LOWER TIMEOUT"
+- name: "20. TEST ROLLBACK WITH LOWER TIMEOUT"                              #{{{1
   hosts: tests
   gather_facts: no
   become: yes
@@ -1030,7 +1030,7 @@
 
 
 ################################################################################
-- name: "21. TEST ROLLBACK WITH UPPER TIMEOUT"
+- name: "21. TEST ROLLBACK WITH UPPER TIMEOUT"                              #{{{1
   hosts: tests
   gather_facts: no
   become: yes
@@ -1083,7 +1083,7 @@
 # Ensure it is possible to update several rules by playing the role only once,
 # even when neither the 'name' nor the 'dport' match between an old rule and a
 # new rule.
-- name: "22. TEST RULE UPDATE BY ACTION 'APPEND'"
+- name: "22. TEST RULE UPDATE BY ACTION 'APPEND'"                           #{{{1
   hosts: tests
   gather_facts: no
   become: yes
@@ -1151,7 +1151,7 @@
 
 
 ################################################################################
-- name: "CONGRATULATIONS"
+- name: "CONGRATULATIONS"                                                   #{{{1
   hosts: tests
   gather_facts: no
   tags: always
