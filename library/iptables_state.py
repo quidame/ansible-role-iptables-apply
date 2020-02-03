@@ -89,6 +89,7 @@ options:
         If not specified, output includes all active tables.
     type: str
     choices: [ filter, nat, mangle, raw, security ]
+requirements: [iptables, ip6tables]
 '''
 
 EXAMPLES = r'''
