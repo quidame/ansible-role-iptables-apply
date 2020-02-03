@@ -103,6 +103,7 @@ options:
         is unable to remove it.
       - Gets a value built from C(async_dir).
     type: path
+requirements: [iptables, ip6tables]
 '''
 
 EXAMPLES = r'''
