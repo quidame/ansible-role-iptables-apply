@@ -1,5 +1,13 @@
 # iptables_apply
 
+## [4.1.1] 2020-02-03
+### Fixed
+- 'ansible-test sanity' errors
+
+### Added
+- module's DOCUMENTATION.requirements
+- vim fold markers in playbook test.yml
+
 ## [4.1.0] 2020-01-20
 ### Added
 - Role assertions (ansible and OS compatibility)

@@ -17,7 +17,7 @@ module: iptables_state
 short_description: Save iptables state into a file or restore it from a file
 version_added: "2.10"
 author:
-  - quidame <quidame@poivron.org>
+  - quidame (@quidame)
 description:
   - C(iptables) is used to set up, maintain, and inspect the tables of IP
     packet filter rules in the Linux kernel.
@@ -89,6 +89,21 @@ options:
         If not specified, output includes all active tables.
     type: str
     choices: [ filter, nat, mangle, raw, security ]
+  _timeout:
+    description:
+      - Internal parameter passed in to the module by its action plugin.
+      - Delay, in seconds, before rolling back to the previous rules if the
+        action plugin is unable to remove the backup/cookie storing these rules.
+      - Gets the same value than C(async) task attribute.
+    type: int
+  _back:
+    description:
+      - Internal parameter passed in to the module by its action plugin.
+      - Path of the backup/cookie storing rules to restore if the action plugin
+        is unable to remove it.
+      - Gets a value built from C(async_dir).
+    type: path
+requirements: [iptables, ip6tables]
 '''
 
 EXAMPLES = r'''
@@ -165,26 +180,26 @@ from ansible.module_utils._text import to_bytes, to_native
 
 
 IPTABLES = dict(
-        ipv4='iptables',
-        ipv6='ip6tables',
+    ipv4='iptables',
+    ipv6='ip6tables',
 )
 
 SAVE = dict(
-        ipv4='iptables-save',
-        ipv6='ip6tables-save',
+    ipv4='iptables-save',
+    ipv6='ip6tables-save',
 )
 
 RESTORE = dict(
-        ipv4='iptables-restore',
-        ipv6='ip6tables-restore',
+    ipv4='iptables-restore',
+    ipv6='ip6tables-restore',
 )
 
 TABLES = dict(
-        filter = ['INPUT', 'FORWARD', 'OUTPUT'],
-        mangle = ['PREROUTING','INPUT','FORWARD','OUTPUT','POSTROUTING'],
-        nat = ['PREROUTING','INPUT','OUTPUT','POSTROUTING'],
-        raw = ['PREROUTING','OUTPUT'],
-        security = ['INPUT', 'FORWARD', 'OUTPUT'],
+    filter=['INPUT', 'FORWARD', 'OUTPUT'],
+    mangle=['PREROUTING', 'INPUT', 'FORWARD', 'OUTPUT', 'POSTROUTING'],
+    nat=['PREROUTING', 'INPUT', 'OUTPUT', 'POSTROUTING'],
+    raw=['PREROUTING', 'OUTPUT'],
+    security=['INPUT', 'FORWARD', 'OUTPUT'],
 )
 
 
@@ -229,7 +244,8 @@ def initialize_from_null_state(bin_iptables, initcommand, table=None):
     back to it, i.e. iptables-save output is not empty. This also works for the
     iptables-nft-save alternative.
     '''
-    if table is None: table = 'filter'
+    if table is None:
+        table = 'filter'
     PARTCOMMAND = [bin_iptables, '-t', table, '-P']
 
     for chain in TABLES[table]:
@@ -249,9 +265,11 @@ def string_to_filtered_b_lines(string, counters):
     '''
     b_string = to_bytes(string, errors='surrogate_or_strict')
     b_string = re.sub('((^|\n)# (Generated|Completed)[^\n]*) on [^\n]*', '\\1', b_string)
-    if not counters: b_string = re.sub('\[[0-9]+:[0-9]+\]', '[0:0]', b_string)
+    if not counters:
+        b_string = re.sub('[[][0-9]+:[0-9]+[]]', '[0:0]', b_string)
     b_lines = b_string.splitlines()
-    while '' in b_lines: b_lines.remove('')
+    while '' in b_lines:
+        b_lines.remove('')
     return b_lines
 
 
@@ -288,7 +306,6 @@ def main():
     _timeout = module.params['_timeout']
     _back = module.params['_back']
 
-
     bin_iptables = module.get_bin_path(IPTABLES[ip_version], True)
     bin_iptables_save = module.get_bin_path(SAVE[ip_version], True)
     bin_iptables_restore = module.get_bin_path(RESTORE[ip_version], True)
@@ -313,10 +330,9 @@ def main():
 
     for chance in (1, 2):
         (rc, stdout, stderr) = module.run_command(INITCOMMAND, check_rc=True)
-        if stdout and ( table is None or len(stdout.splitlines()) >= len(TABLES[table]) + 4 ):
+        if stdout and (table is None or len(stdout.splitlines()) >= len(TABLES[table]) + 4):
             break
-        else:
-            (rc, stdout, stderr) = initialize_from_null_state(bin_iptables, INITCOMMAND, table=table)
+        (rc, stdout, stderr) = initialize_from_null_state(bin_iptables, INITCOMMAND, table=table)
 
     initial_state = string_to_filtered_b_lines(stdout, counters)
     if initial_state is None:
@@ -362,8 +378,11 @@ def main():
 
     (rc, stdout, stderr) = module.run_command(TESTCOMMAND)
     if rc != 0:
-        module.fail_json(msg="Source %s is not suitable for input to %s" % (path,
-            os.path.basename(bin_iptables_restore)), rc=rc, stdout=stdout, stderr=stderr)
+        module.fail_json(
+            msg="Source %s is not suitable for input to %s" % (path, os.path.basename(bin_iptables_restore)),
+            rc=rc,
+            stdout=stdout,
+            stderr=stderr)
 
     (rc, stdout, stderr) = module.run_command(MAINCOMMAND, check_rc=True)
     (rc, stdout, stderr) = module.run_command(INITCOMMAND, check_rc=True)
@@ -373,12 +392,11 @@ def main():
 
     if _back is None:
         module.exit_json(
-                applied=True,
-                changed=changed,
-                cmd=cmd,
-                initial_state=initial_state,
-                restored_state=restored_state)
-
+            applied=True,
+            changed=changed,
+            cmd=cmd,
+            initial_state=initial_state,
+            restored_state=restored_state)
 
     # The rollback implementation currently needs:
     # Here:
@@ -398,11 +416,11 @@ def main():
             time.sleep(1)
             continue
         module.exit_json(
-                applied=True,
-                changed=changed,
-                cmd=cmd,
-                initial_state=initial_state,
-                restored_state=restored_state)
+            applied=True,
+            changed=changed,
+            cmd=cmd,
+            initial_state=initial_state,
+            restored_state=restored_state)
 
     # Here we are: for whatever reason, but probably due to the current ruleset,
     # the action plugin (i.e. on the controller) was unable to remove the backup
@@ -414,12 +432,12 @@ def main():
     backed_state = string_to_filtered_b_lines(stdout, counters)
 
     module.fail_json(
-            rollback_complete=backed_state==initial_state,
-            applied=False,
-            msg="Failed to confirm state restored from %s. Firewall has been rolled back to initial state." % (path),
-            cmd=cmd,
-            initial_state=initial_state,
-            restored_state=restored_state)
+        rollback_complete=(backed_state == initial_state),
+        applied=False,
+        msg="Failed to confirm state restored from %s. Firewall has been rolled back to initial state." % (path),
+        cmd=cmd,
+        initial_state=initial_state,
+        restored_state=restored_state)
 
 
 if __name__ == '__main__':
