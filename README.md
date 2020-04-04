@@ -41,7 +41,7 @@ This role comes with the following features:
   anymore.
 - per-rule firewall management, allowing other roles to add or remove rules
   when installing or uninstalling services respectively.
-- easy-to-write rules, with a list of dictionnaries with only two mandatory
+- easy-to-write rules, with a list of dictionaries with only two mandatory
   parameters.
 
 This role ships a custom ansible module `iptables_state` to manage saving and
@@ -58,8 +58,8 @@ Role Variables
 
 All variables used by the role are explicitly declared either in *defaults* or
 in *vars* directories. Those declared in *vars* shouldn't be overridden in
-almost all cases (and can't be overridden in *group_vars* or *host_vars*). So
-this section is divided into two parts,
+almost all cases (and can't be overridden from inventory). So this section
+is divided in two parts,
 [Common Variables](#common-variables) and
 [Advanced Variables](#advanced-variables)
 
@@ -88,7 +88,7 @@ iptables_apply__action: template
 
 * The iptables rules to `append`/`insert` to, or to `delete` from the current
   rules, depending on `iptables_apply__action` value.  This is a list of
-  dictionnaries accepting the following keys:
+  dictionaries accepting the following keys:
 
   | key | mandatory | type | choices | default | description |
   | :-- | :-------- | :--- | :------ | :------ | :---------- |
@@ -162,9 +162,9 @@ make sense as long as `iptables_apply__action`'s value is `template`.
 
 All variables used by the role are explicitly declared either in *defaults* or
 in *vars* directories. Those declared in *vars* shouldn't be overridden in
-almost all cases (and can't be overridden in *group_vars* or *host_vars*). So
-this section is divided into two parts,
-[Common Templatings](#common-templating) and
+almost all cases (and can't be overridden from inventory). So this section
+is divided in two parts,
+[Common Templating](#common-templating) and
 [Advanced Templating](#advanced-templating)
 
 ### Common Templating
@@ -178,7 +178,7 @@ iptables_apply__template: iptables_apply.j2
 ```
 
 * The iptables rules to apply in addition to the sanity rules provided by the
-  template.  This is a list of dictionnaries with the same keys than
+  template.  This is a list of dictionaries with the same keys than
   `iptables_apply__rules`, and defaults to the same value.
 
 ```yaml
