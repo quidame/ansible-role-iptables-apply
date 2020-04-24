@@ -211,7 +211,7 @@ def write_state(b_path, b_lines, validator, changed):
     tmpfd, tmpfile = tempfile.mkstemp()
     with os.fdopen(tmpfd, 'wb') as f:
         for b_line in b_lines:
-            f.write('%s\n' % b_line)
+            f.write(b'%s\n' % b_line)
 
     # Test it, i.e. ensure it is in good shape (not a oneliner, no litteral '\n'
     # at EOL, and so on).
@@ -266,9 +266,9 @@ def string_to_filtered_b_lines(string, counters):
     by default. And return the result as a list of bytes.
     '''
     b_string = to_bytes(string, errors='surrogate_or_strict')
-    b_string = re.sub('((^|\n)# (Generated|Completed)[^\n]*) on [^\n]*', '\\1', b_string)
+    b_string = re.sub(b'((^|\n)# (Generated|Completed)[^\n]*) on [^\n]*', b'\\1', b_string)
     if not counters:
-        b_string = re.sub('[[][0-9]+:[0-9]+[]]', '[0:0]', b_string)
+        b_string = re.sub(b'[[][0-9]+:[0-9]+[]]', b'[0:0]', b_string)
     b_lines = b_string.splitlines()
     while '' in b_lines:
         b_lines.remove('')
@@ -391,7 +391,7 @@ def main():
         tmpfd, tmpfile = tempfile.mkstemp()
         with os.fdopen(tmpfd, 'wb') as f:
             for b_line in initial_state:
-                f.write('%s\n' % b_line)
+                f.write(b'%s\n' % b_line)
 
         if filecmp.cmp(tmpfile, b_path):
             restored_state = initial_state
