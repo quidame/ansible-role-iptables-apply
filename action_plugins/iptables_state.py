@@ -82,7 +82,8 @@ class ActionModule(ActionBase):
 
             if module_args.get('state', None) == 'restored':
                 if not task_async:
-                    display.warning(self.MSG_WARNING__NO_ASYNC_IS_NO_ROLLBACK)
+                    if not self._play_context.check_mode:
+                        display.warning(self.MSG_WARNING__NO_ASYNC_IS_NO_ROLLBACK)
                 elif task_poll:
                     raise AnsibleActionFail(self.MSG_ERROR__ASYNC_AND_POLL_NOT_ZERO)
                 else:
