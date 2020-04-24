@@ -240,7 +240,7 @@ def write_state(b_path, b_lines, validator, changed):
     return changed
 
 
-def initialize_from_null_state(bin_iptables, initcommand, table=None):
+def initialize_from_null_state(bin_iptables, initcommand, table):
     '''
     This ensures iptables-state output is suitable for iptables-restore to roll
     back to it, i.e. iptables-save output is not empty. This also works for the
@@ -315,6 +315,7 @@ def main():
     os.umask(0o077)
     changed = False
     COMMANDARGS = []
+    INITCOMMAND = [bin_iptables_save]
 
     if counters:
         COMMANDARGS.append('--counters')
@@ -322,19 +323,25 @@ def main():
     if modprobe is not None:
         COMMANDARGS.append('--modprobe')
         COMMANDARGS.append(modprobe)
+        INITCOMMAND.append('--modprobe')
+        INITCOMMAND.append(modprobe)
 
     if table is not None:
         COMMANDARGS.append('--table')
         COMMANDARGS.append(table)
 
-    INITCOMMAND = list(COMMANDARGS)
-    INITCOMMAND.insert(0, bin_iptables_save)
+    BASECOMMAND = list(COMMANDARGS)
+    BASECOMMAND.insert(0, bin_iptables_save)
 
-    for chance in (1, 2):
-        (rc, stdout, stderr) = module.run_command(INITCOMMAND, check_rc=True)
-        if stdout and (table is None or len(stdout.splitlines()) >= len(TABLES[table]) + 4):
-            break
-        (rc, stdout, stderr) = initialize_from_null_state(bin_iptables, INITCOMMAND, table=table)
+    # The issue comes when wanting to restore state from empy iptable-save's
+    # output...
+    (rc, stdout, stderr) = module.run_command(INITCOMMAND, check_rc=True)
+    if table is not None:
+        if len(stdout) == 0 or '*%s' % table not in stdout.splitlines():
+            (rc, stdout, stderr) = initialize_from_null_state(bin_iptables, INITCOMMAND, table)
+    else:
+        if len(stdout) == 0 or '*filter' not in stdout.splitlines():
+            (rc, stdout, stderr) = initialize_from_null_state(bin_iptables, INITCOMMAND, 'filter')
 
     initial_state = string_to_filtered_b_lines(stdout, counters)
     if initial_state is None:
@@ -343,12 +350,31 @@ def main():
     if path is not None:
         b_path = to_bytes(path, errors='surrogate_or_strict')
 
-    if state == 'saved':
-        changed = write_state(b_path, initial_state, bin_iptables_restore, changed)
-
     if state != 'restored':
-        cmd = ' '.join(INITCOMMAND)
-        module.exit_json(changed=changed, cmd=cmd, initial_state=initial_state)
+        cmd = ' '.join(BASECOMMAND)
+        (rc, stdout, stderr) = module.run_command(BASECOMMAND, check_rc=True)
+
+        if state == 'saved':
+            saved_state = string_to_filtered_b_lines(stdout, counters)
+            changed = write_state(b_path, saved_state, bin_iptables_restore, changed)
+            module.exit_json(
+                changed=changed,
+                cmd=cmd,
+                initial_state=initial_state,
+                saved_state=saved_state)
+
+        elif table is None:
+            module.exit_json(
+                changed=changed,
+                cmd=cmd,
+                initial_state=initial_state)
+
+        else:
+            module.exit_json(
+                changed=changed,
+                cmd=cmd,
+                initial_state=initial_state,
+                iptable_state=stdout.splitlines())
 
     #
     # All remaining code is for state=restored
@@ -404,7 +430,7 @@ def main():
 
     else:
         (rc, stdout, stderr) = module.run_command(MAINCOMMAND, check_rc=True)
-        (rc, stdout, stderr) = module.run_command(INITCOMMAND, check_rc=True)
+        (rc, stdout, stderr) = module.run_command(BASECOMMAND, check_rc=True)
         restored_state = string_to_filtered_b_lines(stdout, counters)
 
     if restored_state != initial_state:
@@ -448,7 +474,7 @@ def main():
     (rc, stdout, stderr) = module.run_command(BACKCOMMAND, check_rc=True)
     os.remove(b_back)
 
-    (rc, stdout, stderr) = module.run_command(INITCOMMAND, check_rc=True)
+    (rc, stdout, stderr) = module.run_command(BASECOMMAND, check_rc=True)
     backed_state = string_to_filtered_b_lines(stdout, counters)
 
     module.fail_json(
