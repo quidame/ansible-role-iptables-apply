@@ -51,9 +51,6 @@ class ActionModule(ActionBase):
         del async_result['ansible_job_id']
         del async_result['finished']
 
-        if async_result.get('restored_state', None) == async_result['initial_state']:
-            async_result['changed'] = False
-
         return async_result
 
     def run(self, tmp=None, task_vars=None):
