@@ -111,11 +111,6 @@ class ActionModule(ActionBase):
             # do work!
             result = merge_hash(result, self._execute_module(module_args=module_args, task_vars=task_vars, wrap_async=wrap_async))
 
-            # Remove internal params from results when not used
-            if result.get('invocation', {}).get('module_args'):
-                del result['invocation']['module_args']['_timeout']
-                del result['invocation']['module_args']['_back']
-
             # Then the 3-steps "go ahead or rollback":
             # - reset connection to ensure a persistent one will not be reused
             # - confirm the restored state by removing the backup on the remote
@@ -127,7 +122,7 @@ class ActionModule(ActionBase):
                 except AttributeError:
                     display.warning("Connection plugin does not allow to reset the connection.")
 
-                confirm_cmd = 'rm %s' % module_args['_back']
+                confirm_cmd = 'rm -f %s' % module_args['_back']
                 remaining_time = int(module_args['_timeout'])
                 for x in range(int(module_args['_timeout'])):
                     time.sleep(1)
@@ -137,7 +132,7 @@ class ActionModule(ActionBase):
                     # - ansible_timeout is able to cover dropped requests (due
                     #   to a rule or policy DROP) if not lower than async_val.
                     try:
-                        confirm_res = self._low_level_execute_command(confirm_cmd, sudoable=self.DEFAULT_SUDOABLE)
+                        garbage = self._low_level_execute_command(confirm_cmd, sudoable=self.DEFAULT_SUDOABLE)
                         break
                     except AnsibleConnectionFailure:
                         continue
@@ -159,5 +154,11 @@ class ActionModule(ActionBase):
 
         # remove a temporary path we created
         self._remove_tmp_path(self._connection._shell.tmpdir)
+
+        # Remove internal params from results
+        if result.get('invocation', {}).get('module_args'):
+            if '_timeout' in result['invocation']['module_args']:
+                del result['invocation']['module_args']['_timeout']
+                del result['invocation']['module_args']['_back']
 
         return result
