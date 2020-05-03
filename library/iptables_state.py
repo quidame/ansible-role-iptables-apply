@@ -339,7 +339,7 @@ def initialize_from_null_state(resetpolicy, initcommand, table):
     return (rc, out, err)
 
 
-def string_to_filtered_b_lines(string):
+def filter_and_format_state(string):
     '''
     Remove timestamps to ensure idempotence between runs. Also remove counters
     by default. And return the result as a list of bytes.
@@ -485,7 +485,7 @@ def main():
     elif len(stdout) == 0 or '*%s' % table not in stdout.splitlines():
         (rc, stdout, stderr) = initialize_from_null_state(RESETPOLICY, INITCOMMAND, table)
 
-    initial_state = string_to_filtered_b_lines(stdout)
+    initial_state = filter_and_format_state(stdout)
     if initial_state is None:
         module.fail_json(msg="Unable to initialize firewall from NULL state.")
 
@@ -493,7 +493,7 @@ def main():
     # initial_state.
     (rc, stdout, stderr) = module.run_command(SAVECOMMAND, check_rc=True)
     tables_before = per_table_state(SAVECOMMAND, stdout)
-    initref_state = string_to_filtered_b_lines(stdout)
+    initref_state = filter_and_format_state(stdout)
 
     if state is None:
         module.exit_json(
@@ -559,7 +559,7 @@ def main():
     else:
         (rc, stdout, stderr) = module.run_command(MAINCOMMAND, check_rc=True)
         (rc, stdout, stderr) = module.run_command(SAVECOMMAND, check_rc=True)
-        restored_state = string_to_filtered_b_lines(stdout)
+        restored_state = filter_and_format_state(stdout)
 
     if restored_state != initref_state and restored_state != initial_state:
         if module.check_mode:
