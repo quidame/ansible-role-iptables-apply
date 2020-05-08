@@ -88,6 +88,11 @@ options:
         table. If not specified, output includes all active tables.
     type: str
     choices: [ filter, nat, mangle, raw, security ]
+  wait:
+    description:
+      - Wait N seconds for the xtables lock to prevent instant failure in case
+        multiple instances of the program are running concurrently.
+    type: int
   _timeout:
     description:
       - Internal parameter passed in to the module by its action plugin.
@@ -238,7 +243,7 @@ import filecmp
 import shutil
 
 from ansible.module_utils.basic import AnsibleModule
-from ansible.module_utils._text import to_bytes, to_native
+from ansible.module_utils._text import to_bytes, to_native, to_text
 
 
 IPTABLES = dict(
@@ -256,40 +261,30 @@ RESTORE = dict(
     ipv6='ip6tables-restore',
 )
 
-TABLES = dict(
-    filter=['INPUT', 'FORWARD', 'OUTPUT'],
-    mangle=['PREROUTING', 'INPUT', 'FORWARD', 'OUTPUT', 'POSTROUTING'],
-    nat=['PREROUTING', 'INPUT', 'POSTROUTING', 'OUTPUT'],
-    raw=['PREROUTING', 'OUTPUT'],
-    security=['INPUT', 'FORWARD', 'OUTPUT'],
-)
+TABLES = ['filter', 'mangle', 'nat', 'raw', 'security']
 
 
 def read_state(b_path):
     '''
-    Read a file and store its content in a variable as a list of bytes.
+    Read a file and store its content in a variable as a list.
     '''
-    with open(b_path, 'rb') as f:
-        b_lines = f.read().splitlines()
-    while b'' in b_lines:
-        b_lines.remove(b'')
-    return (b_lines)
+    with open(b_path, 'r') as f:
+        text = f.read()
+    lines = text.splitlines()
+    while '' in lines:
+        lines.remove('')
+    return (lines)
 
 
-def write_state(b_path, b_lines, validator, changed):
+def write_state(b_path, lines, changed):
     '''
     Write given contents to the given path, and return changed status.
     '''
     # Populate a temporary file
     tmpfd, tmpfile = tempfile.mkstemp()
-    with os.fdopen(tmpfd, 'wb') as f:
-        for b_line in b_lines:
-            f.write(b'%s\n' % b_line)
-
-    validator.append(tmpfile)
-    # Test it, i.e. ensure it is in good shape (not a oneliner, no litteral '\n'
-    # at EOL, and so on).
-    (rc, out, err) = module.run_command(validator, check_rc=True)
+    with os.fdopen(tmpfd, 'w') as f:
+        for line in lines:
+            f.write('%s\n' % line)
 
     # Prepare to copy temporary file to the final destination
     if not os.path.exists(b_path):
@@ -301,7 +296,7 @@ def write_state(b_path, b_lines, validator, changed):
             except Exception as e:
                 module.fail_json(
                     msg='Error creating %s. Error code: %s. Error description: %s' % (destdir, e[0], e[1]),
-                    initial_state=b_lines)
+                    initial_state=lines)
         changed = True
 
     elif not filecmp.cmp(tmpfile, b_path):
@@ -315,12 +310,12 @@ def write_state(b_path, b_lines, validator, changed):
             path = to_native(b_path, errors='surrogate_or_strict')
             module.fail_json(
                 msg='Error saving state into %s. Error code: %s. Error description: %s' % (path, e[0], e[1]),
-                initial_state=b_lines)
+                initial_state=lines)
 
     return changed
 
 
-def initialize_from_null_state(resetpolicy, initcommand, table):
+def initialize_from_null_state(initializer, initcommand, table):
     '''
     This ensures iptables-state output is suitable for iptables-restore to roll
     back to it, i.e. iptables-save output is not empty. This also works for the
@@ -328,13 +323,13 @@ def initialize_from_null_state(resetpolicy, initcommand, table):
     '''
     if table is None:
         table = 'filter'
-    resetpolicy.extend(['--table', table])
 
-    for chain in TABLES[table]:
-        RESETPOLICY = list(resetpolicy)
-        RESETPOLICY.extend(['-P', chain, 'ACCEPT'])
-        (rc, out, err) = module.run_command(RESETPOLICY, check_rc=True)
+    tmpfd, tmpfile = tempfile.mkstemp()
+    with os.fdopen(tmpfd, 'w') as f:
+        f.write('*%s\nCOMMIT\n' % table)
 
+    initializer.append(tmpfile)
+    (rc, out, err) = module.run_command(initializer, check_rc=True)
     (rc, out, err) = module.run_command(initcommand, check_rc=True)
     return (rc, out, err)
 
@@ -342,16 +337,15 @@ def initialize_from_null_state(resetpolicy, initcommand, table):
 def filter_and_format_state(string):
     '''
     Remove timestamps to ensure idempotence between runs. Also remove counters
-    by default. And return the result as a list of bytes.
+    by default. And return the result as a list.
     '''
-    b_string = to_bytes(string, errors='surrogate_or_strict')
-    b_string = re.sub(b'((^|\n)# (Generated|Completed)[^\n]*) on [^\n]*', b'\\1', b_string)
+    string = re.sub('((^|\n)# (Generated|Completed)[^\n]*) on [^\n]*', '\\1', string)
     if not module.params['counters']:
-        b_string = re.sub(b'[[][0-9]+:[0-9]+[]]', b'[0:0]', b_string)
-    b_lines = b_string.splitlines()
-    while b'' in b_lines:
-        b_lines.remove(b'')
-    return (b_lines)
+        string = re.sub('[[][0-9]+:[0-9]+[]]', '[0:0]', string)
+    lines = string.splitlines()
+    while '' in lines:
+        lines.remove('')
+    return (lines)
 
 
 def per_table_state(command, state):
@@ -359,20 +353,17 @@ def per_table_state(command, state):
     Convert raw iptables-save output into usable datastructure, for reliable
     comparisons between initial and final states.
     '''
-    b_state = to_bytes(state, errors='surrogate_or_strict')
-    b_state = b_state.splitlines()
     tables = dict()
     for t in TABLES:
         COMMAND = list(command)
-        if b'*%s' % t in b_state:
+        if '*%s' % t in state.splitlines():
             COMMAND.extend(['--table', t])
             (rc, out, err) = module.run_command(COMMAND, check_rc=True)
-            b_out = to_bytes(out, errors='surrogate_or_strict')
-            b_out = re.sub(b'(^|\n)(# Generated|# Completed|[*]%s|COMMIT)[^\n]*' % t, b'', b_out)
-            b_out = re.sub(b' *[[][0-9]+:[0-9]+[]] *', b'', b_out)
-            table = b_out.splitlines()
-            while b'' in table:
-                table.remove(b'')
+            out = re.sub('(^|\n)(# Generated|# Completed|[*]%s|COMMIT)[^\n]*' % t, '', out)
+            out = re.sub(' *[[][0-9]+:[0-9]+[]] *', '', out)
+            table = out.splitlines()
+            while '' in table:
+                table.remove('')
             tables[t] = table
     return (tables)
 
@@ -390,6 +381,7 @@ def main():
             counters=dict(type='bool', default=False),
             modprobe=dict(type='path'),
             ip_version=dict(type='str', choices=['ipv4', 'ipv6'], default='ipv4'),
+            wait=dict(type='int'),
             _timeout=dict(type='int'),
             _back=dict(type='path'),
         ),
@@ -407,6 +399,7 @@ def main():
     counters = module.params['counters']
     modprobe = module.params['modprobe']
     ip_version = module.params['ip_version']
+    wait = module.params['wait']
     _timeout = module.params['_timeout']
     _back = module.params['_back']
 
@@ -417,8 +410,8 @@ def main():
     os.umask(0o077)
     changed = False
     COMMANDARGS = []
-    RESETPOLICY = [bin_iptables]
     INITCOMMAND = [bin_iptables_save]
+    INITIALIZER = [bin_iptables_restore]
     TESTCOMMAND = [bin_iptables_restore, '--test']
 
     if counters:
@@ -426,6 +419,9 @@ def main():
 
     if table is not None:
         COMMANDARGS.extend(['--table', table])
+
+    if wait is not None:
+        TESTCOMMAND.extend(['--wait', '%s' % wait])
 
     if modprobe is not None:
         b_modprobe = to_bytes(modprobe, errors='surrogate_or_strict')
@@ -438,7 +434,7 @@ def main():
         if not os.access(b_modprobe, os.X_OK):
             module.fail_json(msg="modprobe %s not executable" % modprobe)
         COMMANDARGS.extend(['--modprobe', modprobe])
-        RESETPOLICY.extend(['--modprobe', modprobe])
+        INITIALIZER.extend(['--modprobe', modprobe])
         INITCOMMAND.extend(['--modprobe', modprobe])
         TESTCOMMAND.extend(['--modprobe', modprobe])
 
@@ -473,17 +469,17 @@ def main():
     if table is None:
         if state == 'restored':
             for t in TABLES:
-                if b'*%s' % t in state_to_restore:
+                if '*%s' % t in state_to_restore:
                     if len(stdout) == 0 or '*%s' % t not in stdout.splitlines():
-                        (rc, stdout, stderr) = initialize_from_null_state(RESETPOLICY, INITCOMMAND, t)
+                        (rc, stdout, stderr) = initialize_from_null_state(INITIALIZER, INITCOMMAND, t)
         elif len(stdout) == 0:
-            (rc, stdout, stderr) = initialize_from_null_state(RESETPOLICY, INITCOMMAND, 'filter')
+            (rc, stdout, stderr) = initialize_from_null_state(INITIALIZER, INITCOMMAND, 'filter')
 
-    elif state == 'restored' and b'*%s' % table not in state_to_restore:
+    elif state == 'restored' and '*%s' % table not in state_to_restore:
         module.fail_json(msg="Table %s to restore not defined in %s" % (table, path))
 
     elif len(stdout) == 0 or '*%s' % table not in stdout.splitlines():
-        (rc, stdout, stderr) = initialize_from_null_state(RESETPOLICY, INITCOMMAND, table)
+        (rc, stdout, stderr) = initialize_from_null_state(INITIALIZER, INITCOMMAND, table)
 
     initial_state = filter_and_format_state(stdout)
     if initial_state is None:
@@ -503,7 +499,7 @@ def main():
             initial_state=initial_state)
 
     elif state == 'saved':
-        changed = write_state(b_path, initref_state, TESTCOMMAND, changed)
+        changed = write_state(b_path, initref_state, changed)
         module.exit_json(
             changed=changed,
             cmd=cmd,
@@ -518,9 +514,12 @@ def main():
     MAINCOMMAND = list(COMMANDARGS)
     MAINCOMMAND.insert(0, bin_iptables_restore)
 
+    if wait is not None:
+        MAINCOMMAND.extend(['--wait', '%s' % wait])
+
     if _back is not None:
         b_back = to_bytes(_back, errors='surrogate_or_strict')
-        garbage = write_state(b_back, initial_state, TESTCOMMAND, changed)
+        garbage = write_state(b_back, initref_state, changed)
         BACKCOMMAND = list(MAINCOMMAND)
         BACKCOMMAND.append(_back)
 
@@ -532,24 +531,34 @@ def main():
 
     TESTCOMMAND = list(MAINCOMMAND)
     TESTCOMMAND.insert(1, '--test')
+    error_msg = "Source %s is not suitable for input to %s" % (path, os.path.basename(bin_iptables_restore))
 
-    (rc, stdout, stderr) = module.run_command(TESTCOMMAND)
-    if rc != 0:
-        module.fail_json(
-            msg="Source %s is not suitable for input to %s" % (path, os.path.basename(bin_iptables_restore)),
-            rc=rc,
-            stdout=stdout,
-            stderr=stderr,
-            tables=tables_before,
-            initial_state=initial_state,
-            restored=state_to_restore,
-            applied=False)
+    # Due to a bug in iptables-nft-restore --test, we have to validate tables
+    # one by one (https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=960003).
+    for t in tables_before:
+        testcommand = list(TESTCOMMAND)
+        testcommand.extend(['--table', t])
+        (rc, stdout, stderr) = module.run_command(testcommand)
+
+        if 'Another app is currently holding the xtables lock' in stderr:
+            error_msg = stderr
+
+        if rc != 0:
+            module.fail_json(
+                msg=error_msg,
+                rc=rc,
+                stdout=stdout,
+                stderr=stderr,
+                tables=tables_before,
+                initial_state=initial_state,
+                restored=state_to_restore,
+                applied=False)
 
     if module.check_mode:
         tmpfd, tmpfile = tempfile.mkstemp()
-        with os.fdopen(tmpfd, 'wb') as f:
-            for b_line in initial_state:
-                f.write(b'%s\n' % b_line)
+        with os.fdopen(tmpfd, 'w') as f:
+            for line in initial_state:
+                f.write('%s\n' % line)
 
         if filecmp.cmp(tmpfile, b_path):
             restored_state = initial_state
@@ -557,7 +566,18 @@ def main():
             restored_state = state_to_restore
 
     else:
-        (rc, stdout, stderr) = module.run_command(MAINCOMMAND, check_rc=True)
+        (rc, stdout, stderr) = module.run_command(MAINCOMMAND)
+        if 'Another app is currently holding the xtables lock' in stderr:
+            module.fail_json(
+                msg=stderr,
+                rc=rc,
+                stdout=stdout,
+                stderr=stderr,
+                tables=tables_before,
+                initial_state=initial_state,
+                restored=state_to_restore,
+                applied=False)
+
         (rc, stdout, stderr) = module.run_command(SAVECOMMAND, check_rc=True)
         restored_state = filter_and_format_state(stdout)
 

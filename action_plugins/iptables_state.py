@@ -17,7 +17,7 @@ display = Display()
 class ActionModule(ActionBase):
 
     # Keep internal params away from user interactions
-    _VALID_ARGS = frozenset(('path', 'state', 'table', 'noflush', 'counters', 'modprobe', 'ip_version'))
+    _VALID_ARGS = frozenset(('path', 'state', 'table', 'noflush', 'counters', 'modprobe', 'ip_version', 'wait'))
     DEFAULT_SUDOABLE = True
 
     MSG_ERROR__ASYNC_AND_POLL_NOT_ZERO = (
