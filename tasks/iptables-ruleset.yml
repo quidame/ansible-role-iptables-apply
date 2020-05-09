@@ -1,15 +1,11 @@
 ---
-# Initialize iptables so the output of iptables-save will not be empty.
-# Otherwise, rolling back to previous state will not work when restoring this
-# state from nothing.
+# Create the buffer from the current state.
 - import_tasks: iptables_state.yml
   vars:
     iptables_state__task_name: "save initial state of the firewall into buffer"
     iptables_state__state: saved
     iptables_state__table: filter
     iptables_state__path: "{{ iptables_apply__path_buffer }}"
-  failed_when:
-    - iptables_state__registered.initial_state | length < 7
 
 
 # The regexp being the same, a same task may be used to `append`, `insert` or
@@ -56,7 +52,6 @@
     # of `firstmatch` may lead to duplicated rules and/or lack of idempotency.
     insertafter: "{{ '^:OUTPUT' if iptables_apply__action == 'insert' else omit }}"
     insertbefore: "{{ '^COMMIT' if iptables_apply__action == 'append' else omit }}"
-    validate: "iptables-restore --test %s"
   loop: "{{ iptables_apply__rules }}"
   loop_control:
     loop_var: iptables_apply_item
