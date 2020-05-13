@@ -1,9 +1,14 @@
 ---
 # We need to know the current rules in filter table to stat if template has to
 # be applied or not. But we don't need to store the table in a file.
-- import_tasks: iptables_state.yml
-  vars:
-    iptables_state__task_name: "get initial state of the firewall"
+
+- name: "get initial state of the firewall"
+  iptables_state:
+    path: "{{ iptables_apply__path_buffer }}"
+    state: saved
+  register: iptables_state__registered
+  check_mode: true
+  changed_when: false
 
 
 - name: "rewrite iptables buffer from scratch"

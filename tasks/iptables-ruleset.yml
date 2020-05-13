@@ -1,11 +1,10 @@
 ---
 # Create the buffer from the current state.
-- import_tasks: iptables_state.yml
-  vars:
-    iptables_state__task_name: "save initial state of the firewall into buffer"
-    iptables_state__state: saved
-    iptables_state__table: filter
-    iptables_state__path: "{{ iptables_apply__path_buffer }}"
+- name: "save initial state of the firewall into buffer"
+  iptables_state:
+    path: "{{ iptables_apply__path_buffer }}"
+    state: saved
+    table: filter
 
 
 # The regexp being the same, a same task may be used to `append`, `insert` or
