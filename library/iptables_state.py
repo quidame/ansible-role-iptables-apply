@@ -42,7 +42,7 @@ options:
   counters:
     description:
       - Save or restore the values of all packet and byte counters.
-      - When I(True), the module is not idempotent.
+      - When C(True), the module is not idempotent.
     type: bool
     default: false
   ip_version:
@@ -53,16 +53,16 @@ options:
     default: ipv4
   modprobe:
     description:
-      - Specify the path to the modprobe program internally used by iptables
+      - Specify the path to the C(modprobe) program internally used by iptables
         related commands to load kernel modules.
-      - By default, /proc/sys/kernel/modprobe is inspected to determine the
+      - By default, C(/proc/sys/kernel/modprobe) is inspected to determine the
         executable's path.
     type: path
   noflush:
     description:
       - For I(state=restored), ignored otherwise.
-      - If I(False), restoring iptables rules from a file flushes (deletes)
-        all previous contents of the respective table(s). If I(True), the
+      - If C(False), restoring iptables rules from a file flushes (deletes)
+        all previous contents of the respective table(s). If C(True), the
         previous rules are left untouched (but policies are updated anyway,
         for all built-in chains).
     type: bool
@@ -71,21 +71,22 @@ options:
     description:
       - The file the iptables state should be saved to.
       - The file the iptables state should be restored from.
-      - Required when I(state=saved) or I(state=restored).
     type: path
+    required: yes
   state:
     description:
       - Whether the firewall state should be saved (into a file) or restored
         (from a file).
-      - When this option is not set, the current iptables state is returned.
     type: str
     choices: [ saved, restored ]
+    required: yes
   table:
     description:
-      - When C(state=restored), restore only the named table even if the input
-        file contains other tables.
-      - When C(state=saved) (or left unset), restrict output to the specified
-        table. If not specified, output includes all active tables.
+      - When I(state=restored), restore only the named table even if the input
+        file contains other tables. Fail if the named table is not declared in
+        the file.
+      - When I(state=saved), restrict output to the specified table. If not
+        specified, output includes all active tables.
     type: str
     choices: [ filter, nat, mangle, raw, security ]
   wait:
@@ -93,42 +94,19 @@ options:
       - Wait N seconds for the xtables lock to prevent instant failure in case
         multiple instances of the program are running concurrently.
     type: int
-  _timeout:
-    description:
-      - Internal parameter passed in to the module by its action plugin.
-      - Delay, in seconds, before rolling back to the previous rules if the
-        action plugin is unable to remove the backup/cookie storing these rules.
-      - Gets the same value than C(async) task attribute.
-    type: int
-  _back:
-    description:
-      - Internal parameter passed in to the module by its action plugin.
-      - Path of the backup/cookie storing rules to restore if the action plugin
-        is unable to remove it.
-      - Gets a value built from C(async_dir).
-    type: path
 requirements: [iptables, ip6tables]
 '''
 
 EXAMPLES = r'''
-# This will only retrieve information
-- name: get current state of the firewall
-  iptables_state:
-  register: iptables_state
-
-- name: show current state of the firewall
-  debug:
-    var: iptables_state.initial_state
-
 # This will apply to all loaded/active IPv4 tables.
 - name: Save current state of the firewall in system file
-  iptables_state:
+  community.general.iptables_state:
     state: saved
     path: /etc/sysconfig/iptables
 
 # This will apply only to IPv6 filter table.
 - name: save current state of the firewall in system file
-  iptables_state:
+  community.general.iptables_state:
     ip_version: ipv6
     table: filter
     state: saved
@@ -136,7 +114,7 @@ EXAMPLES = r'''
 
 # This will load a state from a file, with a rollback in case of access loss
 - name: restore firewall state from a file
-  iptables_state:
+  community.general.iptables_state:
     state: restored
     path: /run/iptables.apply
   async: "{{ ansible_timeout }}"
@@ -144,12 +122,25 @@ EXAMPLES = r'''
 
 # This will load new rules by appending them to the current ones
 - name: restore firewall state from a file
-  iptables_state:
+  community.general.iptables_state:
     state: restored
     path: /run/iptables.apply
     noflush: true
   async: "{{ ansible_timeout }}"
   poll: 0
+
+# This will only retrieve information
+- name: get current state of the firewall
+  community.general.iptables_state:
+    state: saved
+    path: /tmp/iptables
+  check_mode: yes
+  changed_when: false
+  register: iptables_state
+
+- name: show current state of the firewall
+  debug:
+    var: iptables_state.initial_state
 '''
 
 RETURN = r'''
@@ -374,8 +365,8 @@ def main():
 
     module = AnsibleModule(
         argument_spec=dict(
-            path=dict(type='path'),
-            state=dict(type='str', choices=['saved', 'restored']),
+            path=dict(type='path', required=True),
+            state=dict(type='str', choices=['saved', 'restored'], required=True),
             table=dict(type='str', choices=['filter', 'nat', 'mangle', 'raw', 'security']),
             noflush=dict(type='bool', default=False),
             counters=dict(type='bool', default=False),
@@ -386,11 +377,13 @@ def main():
             _back=dict(type='path'),
         ),
         required_together=[
-            ['state', 'path'],
             ['_timeout', '_back'],
         ],
         supports_check_mode=True,
     )
+
+    # We'll parse iptables-restore stderr
+    module.run_command_environ_update = dict(LANG='C', LC_MESSAGES='C')
 
     path = module.params['path']
     state = module.params['state']
@@ -441,8 +434,7 @@ def main():
     SAVECOMMAND = list(COMMANDARGS)
     SAVECOMMAND.insert(0, bin_iptables_save)
 
-    if path is not None:
-        b_path = to_bytes(path, errors='surrogate_or_strict')
+    b_path = to_bytes(path, errors='surrogate_or_strict')
 
     if state == 'restored':
         if not os.path.exists(b_path):
@@ -491,14 +483,7 @@ def main():
     tables_before = per_table_state(SAVECOMMAND, stdout)
     initref_state = filter_and_format_state(stdout)
 
-    if state is None:
-        module.exit_json(
-            changed=changed,
-            cmd=cmd,
-            tables=tables_before,
-            initial_state=initial_state)
-
-    elif state == 'saved':
+    if state == 'saved':
         changed = write_state(b_path, initref_state, changed)
         module.exit_json(
             changed=changed,
@@ -544,8 +529,10 @@ def main():
             error_msg = stderr
 
         if rc != 0:
+            cmd = ' '.join(testcommand)
             module.fail_json(
                 msg=error_msg,
+                cmd=cmd,
                 rc=rc,
                 stdout=stdout,
                 stderr=stderr,
@@ -570,6 +557,7 @@ def main():
         if 'Another app is currently holding the xtables lock' in stderr:
             module.fail_json(
                 msg=stderr,
+                cmd=cmd,
                 rc=rc,
                 stdout=stdout,
                 stderr=stderr,
@@ -632,9 +620,14 @@ def main():
     (rc, stdout, stderr) = module.run_command(SAVECOMMAND, check_rc=True)
     tables_rollback = per_table_state(SAVECOMMAND, stdout)
 
+    msg = (
+        "Failed to confirm state restored from %s after %ss. "
+        "Firewall has been rolled back to its initial state." % (path, _timeout)
+    )
+
     module.fail_json(
         changed=(tables_before != tables_rollback),
-        msg="Failed to confirm state restored from %s. Firewall has been rolled back to initial state." % path,
+        msg=msg,
         cmd=cmd,
         tables=tables_before,
         initial_state=initial_state,
