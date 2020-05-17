@@ -18,6 +18,19 @@
   tags: always
 
   tasks:
+    - name: "install python alternatives"
+      alternatives:
+        name: python
+        path: "/usr/bin/python{{ item.version }}"
+        link: /usr/bin/python
+        priority: "{{ item.priority }}"
+      loop:
+        - version: 3
+          priority: 30
+      when:
+        - ansible_os_family|lower in ["debian"]
+        - ansible_distribution_major_version | int != 10
+
     - name: "install package"
       apt:
         name: iptables-persistent
@@ -28,7 +41,6 @@
       until: install is succeeded
       when:
         - ansible_os_family|lower in ["debian"]
-        - ansible_distribution_major_version | int == 10
 
     - name: "install package"
       yum:
@@ -75,12 +87,24 @@
     - init
 
   tasks:
-    - include_role:
+    - import_role:
         name: iptables_apply
         tasks_from: iptables-service.yml
       vars:
         iptables_apply__service_enabled: no
         iptables_apply__service_started: no
+
+    - name: "switch to iptables-legacy alternative"
+      alternatives:
+        name: iptables
+        path: /usr/sbin/iptables-legacy
+      when: iptables_apply__alternative | d('nft') == 'legacy'
+
+    - name: "switch to iptables-nft alternative"
+      alternatives:
+        name: iptables
+        path: /usr/sbin/iptables-nft
+      when: iptables_apply__alternative | d('nft') != 'legacy'
 
     - name: "reboot"
       reboot:
@@ -91,13 +115,10 @@
       changed_when: false
       failed_when: command.stdout_lines | length > 0
 
-    - include_role:
-        name: iptables_apply
-        tasks_from: iptables_state.yml
-      vars:
-        iptables_state__task_name: "initialize firewall from NULL state"
-        iptables_state__path: "{{ iptables_apply__path_buffer }}"
-        iptables_state__state: saved
+    - name: "initialize firewall from NULL state"
+      iptables_state:
+        path: "{{ iptables_apply__path_buffer }}"
+        state: saved
 
     - name: "check iptables-save output is not empty"
       command: iptables-save
@@ -138,7 +159,7 @@
     - init
 
   tasks:
-    - include_role:
+    - import_role:
         name: iptables_apply
         tasks_from: iptables-service.yml
       vars:
@@ -154,14 +175,11 @@
       changed_when: false
       failed_when: command.stdout_lines | length > 0
 
-    - include_role:
-        name: iptables_apply
-        tasks_from: iptables_state.yml
-      vars:
-        iptables_state__task_name: "initialize firewall from NULL state"
-        iptables_state__path: "{{ iptables_apply__path_buffer }}"
-        iptables_state__state: saved
-        iptables_state__table: filter
+    - name: "initialize firewall from NULL state"
+      iptables_state:
+        path: "{{ iptables_apply__path_buffer }}"
+        state: saved
+        table: filter
 
     - name: "check iptables-save output is not empty"
       command: iptables-save
@@ -325,7 +343,7 @@
         iptables_apply__restored: ""
         iptables_apply__ruleset: ""
 
-    - include_role:
+    - import_role:
         name: iptables_apply
 
     - name: "check for idempotency of all tasks"
@@ -354,7 +372,7 @@
   tasks:
     - name: "test rollback after bad 'template'"
       block:
-        - include_role:
+        - import_role:
             name: iptables_apply
           vars:
             iptables_apply__template_once: no
@@ -528,7 +546,7 @@
   tasks:
     - name: "test rollback after bad 'append'"
       block:
-        - include_role:
+        - import_role:
             name: iptables_apply
           vars:
             iptables_apply__action: append
@@ -568,7 +586,7 @@
     - action
 
   pre_tasks:
-    - include_role:
+    - import_role:
         name: iptables_apply
 
     - name: "check the rule to insert is not there"
@@ -673,7 +691,7 @@
   tasks:
     - name: "test rollback after bad 'insert'"
       block:
-        - include_role:
+        - import_role:
             name: iptables_apply
           vars:
             iptables_apply__action: insert
@@ -713,7 +731,7 @@
     - action
 
   pre_tasks:
-    - include_role:
+    - import_role:
         name: iptables_apply
       vars:
         iptables_apply__template_once: no
@@ -823,7 +841,7 @@
   tasks:
     - name: "test rollback after bad 'delete'"
       block:
-        - include_role:
+        - import_role:
             name: iptables_apply
           vars:
             iptables_apply__action: delete
@@ -907,7 +925,7 @@
             path: "{{ iptables_apply__path_buffer }}"
             state: absent
 
-        - include_role:
+        - import_role:
             name: iptables_apply
           vars:
             iptables_apply__template_once: no
@@ -954,7 +972,7 @@
             path: "{{ iptables_apply__path_buffer }}"
             state: absent
 
-        - include_role:
+        - import_role:
             name: iptables_apply
           vars:
             iptables_apply__template_once: no
@@ -1005,7 +1023,7 @@
             path: "{{ iptables_apply__path_buffer }}"
             state: absent
 
-        - include_role:
+        - import_role:
             name: iptables_apply
           vars:
             iptables_apply__template_once: no
@@ -1052,7 +1070,7 @@
             path: "{{ iptables_apply__path_buffer }}"
             state: absent
 
-        - include_role:
+        - import_role:
             name: iptables_apply
           vars:
             iptables_apply__template_once: no
