@@ -1075,9 +1075,6 @@
           vars:
             iptables_apply__template_once: no
             iptables_apply__template_core: no
-            iptables_apply__template_policy: {}
-            iptables_apply__template_rules:
-              - "{{ rules_ssh[0] | combine({'jump':'%s' % upper_timeout_jump | d('REJECT')}) }}"
       rescue:
         - name: "check expected error"
           assert:
