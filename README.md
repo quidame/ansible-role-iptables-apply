@@ -373,8 +373,8 @@ Manage persistence of the current ruleset:
         name: iptables_apply
         tasks_from: iptables_state.yml
       vars:
-	iptables_state__state: saved
-	iptables_state__path: /etc/sysconfig/iptables
+        iptables_state__state: saved
+        iptables_state__path: /etc/sysconfig/iptables
 ```
 
 Or manage the service (for example disable it and keep it started):
