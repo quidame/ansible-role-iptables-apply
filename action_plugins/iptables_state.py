@@ -13,81 +13,91 @@ from ansible.utils.display import Display
 
 display = Display()
 
+
 class ActionModule(ActionBase):
 
     # Keep internal params away from user interactions
-    _VALID_ARGS = frozenset(('path', 'state', 'table', 'noflush', 'counters', 'modprobe', 'ip_version'))
+    _VALID_ARGS = frozenset(('path', 'state', 'table', 'noflush', 'counters', 'modprobe', 'ip_version', 'wait'))
     DEFAULT_SUDOABLE = True
 
     MSG_ERROR__ASYNC_AND_POLL_NOT_ZERO = (
-            "This module doesn't support async>0 and poll>0 when its 'state' param "
-            "is set to 'restored'. To enable its rollback feature (that needs the "
-            "module to run asynchronously on the remote), please set task attribute "
-            "'poll' to 0, and 'async' to a value not greater than 'ansible_timeout' "
-            "(recommended).")
+        "This module doesn't support async>0 and poll>0 when its 'state' param "
+        "is set to 'restored'. To enable its rollback feature (that needs the "
+        "module to run asynchronously on the remote), please set task attribute "
+        "'poll' (=%s) to 0, and 'async' (=%s) to a value >2 and not greater than "
+        "'ansible_timeout' (=%s) (recommended).")
     MSG_WARNING__NO_ASYNC_IS_NO_ROLLBACK = (
-            "Attempts to restore iptables state without rollback in case of mistake "
-            "may lead the ansible controller to loose access to the hosts and never "
-            "regain it before fixing firewall rules through a serial console, or any "
-            "other way except SSH. Please set task attribute 'poll' to 0, and 'async' "
-            "to a value not greater than 'ansible_timeout' (recommended).")
-
+        "Attempts to restore iptables state without rollback in case of mistake "
+        "may lead the ansible controller to loose access to the hosts and never "
+        "regain it before fixing firewall rules through a serial console, or any "
+        "other way except SSH. Please set task attribute 'poll' (=%s) to 0, and "
+        "'async' (=%s) to a value >2 and not greater than 'ansible_timeout' (=%s) "
+        "(recommended).")
+    MSG_WARNING__ASYNC_GREATER_THAN_TIMEOUT = (
+        "You attempt to restore iptables state with rollback in case of mistake, "
+        "but with settings that will lead this rollback to happen AFTER that the "
+        "controller will reach its own timeout. Please set task attribute 'poll' "
+        "(=%s) to 0, and 'async' (=%s) to a value >2 and not greater than "
+        "'ansible_timeout' (=%s) (recommended).")
 
     def _async_result(self, module_args, task_vars, timeout):
         '''
         Retrieve results of the asynchonous task, and display them in place of
         the async wrapper results (those with the ansible_job_id key).
         '''
-        for i in range(timeout):
+        # At least one iteration is required, even if timeout is 0.
+        for i in range(max(1, timeout)):
             async_result = self._execute_module(
-                    module_name='async_status',
-                    module_args=module_args,
-                    task_vars=task_vars,
-                    wrap_async=False)
+                module_name='async_status',
+                module_args=module_args,
+                task_vars=task_vars,
+                wrap_async=False)
             if async_result['finished'] == 1:
                 break
             time.sleep(1)
 
-        del async_result['ansible_job_id']
-        del async_result['finished']
-
-        if async_result.get('restored_state', None) == async_result['initial_state']:
-            async_result['changed'] = False
-
         return async_result
-
 
     def run(self, tmp=None, task_vars=None):
 
-        # individual modules might disagree but as the generic the action plugin, pass at this point.
         self._supports_check_mode = True
         self._supports_async = True
 
         result = super(ActionModule, self).run(tmp, task_vars)
         del tmp  # tmp no longer has any effect
 
-        task_async = self._task.async_val
-        task_poll = self._task.poll
-        module_name = self._task.action
-        module_args = self._task.args
-
-
         if not result.get('skipped'):
-
-            if result.get('invocation', {}).get('module_args'):
-                # avoid passing to modules in case of no_log
-                # should not be set anymore but here for backwards compatibility
-                del result['invocation']['module_args']
 
             # FUTURE: better to let _execute_module calculate this internally?
             wrap_async = self._task.async_val and not self._connection.has_native_async
 
+            # Set short names for values we'll have to compare or reuse
+            task_poll = self._task.poll
+            task_async = self._task.async_val
+            check_mode = self._play_context.check_mode
+            max_timeout = self._connection._play_context.timeout
+            module_name = self._task.action
+            module_args = self._task.args
+
             if module_args.get('state', None) == 'restored':
-                if not task_async:
-                    display.warning(self.MSG_WARNING__NO_ASYNC_IS_NO_ROLLBACK)
+                if not wrap_async:
+                    if not check_mode:
+                        display.warning(self.MSG_WARNING__NO_ASYNC_IS_NO_ROLLBACK % (
+                            task_poll,
+                            task_async,
+                            max_timeout))
                 elif task_poll:
-                    raise AnsibleActionFail(self.MSG_ERROR__ASYNC_AND_POLL_NOT_ZERO)
+                    raise AnsibleActionFail(self.MSG_ERROR__ASYNC_AND_POLL_NOT_ZERO % (
+                        task_poll,
+                        task_async,
+                        max_timeout))
                 else:
+                    if task_async > max_timeout and not check_mode:
+                        display.warning(self.MSG_WARNING__ASYNC_GREATER_THAN_TIMEOUT % (
+                            task_poll,
+                            task_async,
+                            max_timeout))
+
                     # BEGIN snippet from async_status action plugin
                     env_async_dir = [e for e in self._task.environment if
                                      "ANSIBLE_ASYNC_DIR" in e]
@@ -105,21 +115,16 @@ class ActionModule(ActionBase):
                         # inject the async directory based on the shell option into the
                         # module args
                         async_dir = self.get_shell_option('async_dir', default="~/.ansible_async")
-                    ### END snippet from async_status action plugin
+                    # END snippet from async_status action plugin
 
-                    # Bind the loop max duration to the same value on both
-                    # remote and local sides, and set a backup file path.
+                    # Bind the loop max duration to consistent values on both
+                    # remote and local sides (if not the same, make the loop
+                    # longer on the controller); and set a backup file path.
                     module_args['_timeout'] = task_async
                     module_args['_back'] = '%s/iptables.state' % async_dir
 
-
             # do work!
             result = merge_hash(result, self._execute_module(module_args=module_args, task_vars=task_vars, wrap_async=wrap_async))
-
-            # Remove internal params from results when not used
-            if result.get('invocation', {}).get('module_args'):
-                del result['invocation']['module_args']['_timeout']
-                del result['invocation']['module_args']['_back']
 
             # Then the 3-steps "go ahead or rollback":
             # - reset connection to ensure a persistent one will not be reused
@@ -132,9 +137,9 @@ class ActionModule(ActionBase):
                 except AttributeError:
                     display.warning("Connection plugin does not allow to reset the connection.")
 
-                confirm_cmd = 'rm %s' % module_args['_back']
-                remaining_time = int(module_args['_timeout'])
-                for x in range(int(module_args['_timeout'])):
+                confirm_cmd = 'rm -f %s' % module_args['_back']
+                remaining_time = max(task_async, max_timeout)
+                for x in range(max_timeout):
                     time.sleep(1)
                     remaining_time -= 1
                     # - AnsibleConnectionFailure covers rejected requests (i.e.
@@ -142,7 +147,7 @@ class ActionModule(ActionBase):
                     # - ansible_timeout is able to cover dropped requests (due
                     #   to a rule or policy DROP) if not lower than async_val.
                     try:
-                        confirm_res = self._low_level_execute_command(confirm_cmd, sudoable=self.DEFAULT_SUDOABLE)
+                        garbage = self._low_level_execute_command(confirm_cmd, sudoable=self.DEFAULT_SUDOABLE)
                         break
                     except AnsibleConnectionFailure:
                         continue
@@ -153,16 +158,27 @@ class ActionModule(ActionBase):
                     raise AnsibleActionFail("Unable to get 'ansible_job_id'.")
 
                 async_status_args['_async_dir'] = async_dir
-                result = self._async_result(async_status_args, task_vars, remaining_time)
+                result = merge_hash(result, self._async_result(async_status_args, task_vars, remaining_time))
+
+                # Cleanup async related stuff and internal params
+                for key in ('ansible_job_id', 'results_file', 'started', 'finished'):
+                    if result.get(key):
+                        del result[key]
+
+                if result.get('invocation', {}).get('module_args'):
+                    if '_timeout' in result['invocation']['module_args']:
+                        del result['invocation']['module_args']['_back']
+                        del result['invocation']['module_args']['_timeout']
 
                 async_status_args['mode'] = 'cleanup'
                 garbage = self._execute_module(
-                        module_name='async_status',
-                        module_args=async_status_args,
-                        task_vars=task_vars,
-                        wrap_async=False)
+                    module_name='async_status',
+                    module_args=async_status_args,
+                    task_vars=task_vars,
+                    wrap_async=False)
 
-        # remove a temporary path we created
-        self._remove_tmp_path(self._connection._shell.tmpdir)
+        if not wrap_async:
+            # remove a temporary path we created
+            self._remove_tmp_path(self._connection._shell.tmpdir)
 
         return result

@@ -1,9 +1,10 @@
 ---
 - name: "{{ iptables_state__task_name | d('iptables_state') }}"
   iptables_state:
+    path:       "{{ iptables_state__path }}"
+    state:      "{{ iptables_state__state }}"
     table:      "{{ iptables_state__table      | d(omit) }}"
-    state:      "{{ iptables_state__state      | d(omit) }}"
-    path:       "{{ iptables_state__path       | d(omit) }}"
+    wait:       "{{ iptables_state__wait       | d(omit) }}"
     noflush:    "{{ iptables_state__noflush    | d(omit) }}"
     counters:   "{{ iptables_state__counters   | d(omit) }}"
     modprobe:   "{{ iptables_state__modprobe   | d(omit) }}"
