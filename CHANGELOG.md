@@ -1,5 +1,22 @@
 # iptables_apply
 
+## [5.0.1] 2020-05-30
+### Fixed
+- Missing entry for 5.0.0
+
+## [5.0.0] 2020-05-30
+### Changed
+- Refactor `iptables_state` module and plugin:
+  * Add `wait` option
+  * Better handling of tables
+  * Better bytes/string conversions
+  * Drop stateless/informative behaviour
+  * Improve consistency of returned results
+  * Improve idempotency and check mode support
+  * Dissociate timeouts (use `ansible_timeout` on the controller and `async`
+    value on the target)
+- Update role and tests accordingly
+
 ## [4.1.1] 2020-02-03
 ### Fixed
 - 'ansible-test sanity' errors
