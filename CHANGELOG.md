@@ -1,5 +1,10 @@
 # iptables_apply
 
+## [5.0.2] 2020-09-05
+### Changed
+- Update `iptables_state` module and action plugin from community.general
+
+
 ## [5.0.1] 2020-05-30
 ### Fixed
 - Missing entry for 5.0.0
