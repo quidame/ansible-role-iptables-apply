@@ -5,6 +5,7 @@
     path: "{{ iptables_apply__path_buffer }}"
     state: saved
     table: filter
+  register: iptables_state__registered
 
 
 # The regexp being the same, a same task may be used to `append`, `insert` or

@@ -18,6 +18,7 @@
     table: "{{ omit if iptables_apply__action in ['template','flush'] else 'filter' }}"
     noflush: "{{ iptables_apply__template_noflush if iptables_apply__action == 'template' else omit }}"
     path: "{{ iptables_apply__path_buffer }}"
+  #throttle: 1
   async: "{{ ansible_timeout }}"
   poll: 0
   register: iptables_apply__restored
@@ -28,6 +29,7 @@
   iptables_state:
     state: saved
     path: "{{ iptables_apply__service_ruleset }}"
+  #throttle: 1
   when:
     - iptables_apply__persist | bool
 

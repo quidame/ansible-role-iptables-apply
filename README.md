@@ -97,6 +97,7 @@ iptables_apply__action: template
   | `jump` | no | keyword | `ACCEPT`, `DROP`, `REJECT` | `ACCEPT` | What to do with packets matching the rule. |
   | `name` | yes | string ||| Used as the rule's comment. |
   | `protocol` | no | keyword | `tcp`, `udp` | `tcp` | The protocol packets have to match. |
+  | `saddr` | no | string ||| The IP source address packets have to match. |
 
   Defaults to an empty list (`[]`). Example:
 
@@ -104,6 +105,7 @@ iptables_apply__action: template
 iptables_apply__rules:
   - name: PostgreSQL
     dport: 5432
+    saddr: 10.122.43.21
     #protocol: tcp
     #chain: INPUT
     #jump: ACCEPT
@@ -337,10 +339,11 @@ rule's `action` and `state` to it.
         name: iptables_apply
         tasks_from: iptables.yml
   vars:
-    iptables_apply__module_rules:
+    iptables_apply__iptables:
       - action: insert
         chain: INPUT
         protocol: tcp
+        source: 10.112.43.21,10.75.43.21
         source_port: "1024:"
         destination_port: 5432
         ctstate: NEW
@@ -413,7 +416,7 @@ To make use of this role as a galaxy role, put the following lines in
 ```yaml
 - name: iptables_apply
   src: https://github.com/quidame/ansible-role-iptables_apply.git
-  version: 5.0.1
+  version: 5.1.0
   scm: git
 ```
 

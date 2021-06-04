@@ -7,7 +7,6 @@
     path: "{{ iptables_apply__path_buffer }}"
     state: saved
   register: iptables_state__registered
-  check_mode: true
   changed_when: false
 
 

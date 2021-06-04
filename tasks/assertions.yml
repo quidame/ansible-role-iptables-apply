@@ -2,7 +2,7 @@
 - name: "check OS compatibility and ansible version"
   assert:
     that:
-      - ansible_version.full is version('2.8', '>=')
+      - ansible_version.full is version('2.9', '>=')
       - ansible_os_family | lower in ['debian', 'redhat']
       - ansible_service_mgr == "systemd"
     quiet: yes
