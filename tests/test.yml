@@ -29,7 +29,7 @@
           priority: 30
       when:
         - ansible_os_family|lower in ["debian"]
-        - ansible_distribution_version in ["testing"]
+        - ansible_distribution_version in ["testing", "bullseye"]
 
     - name: "install package"
       apt:
@@ -42,14 +42,38 @@
       when:
         - ansible_os_family|lower in ["debian"]
 
+    - name: "switch to iptables-legacy alternative"
+      alternatives:
+        name: iptables
+        path: /usr/sbin/iptables-legacy
+      when:
+        - ansible_os_family|lower in ["debian"]
+        - iptables_apply__alternative | d('nft') == 'legacy'
+
+    - name: "switch to iptables-nft alternative"
+      alternatives:
+        name: iptables
+        path: /usr/sbin/iptables-nft
+      when:
+        - ansible_os_family|lower in ["debian"]
+        - iptables_apply__alternative | d('nft') != 'legacy'
+
     - name: "install package"
       yum:
-        name: iptables
+        name: iptables-services
         state: present
       register: install
       retries: 3
       delay: 5
       until: install is succeeded
+      when:
+        - ansible_os_family|lower in ["redhat"]
+
+    - name: "disable firewalld"
+      systemd:
+        name: firewalld
+        state: stopped
+        enabled: no
       when:
         - ansible_os_family|lower in ["redhat"]
 
@@ -93,18 +117,6 @@
       vars:
         iptables_apply__service_enabled: no
         iptables_apply__service_started: no
-
-    - name: "switch to iptables-legacy alternative"
-      alternatives:
-        name: iptables
-        path: /usr/sbin/iptables-legacy
-      when: iptables_apply__alternative | d('nft') == 'legacy'
-
-    - name: "switch to iptables-nft alternative"
-      alternatives:
-        name: iptables
-        path: /usr/sbin/iptables-nft
-      when: iptables_apply__alternative | d('nft') != 'legacy'
 
     - name: "reboot"
       reboot:
@@ -493,6 +505,11 @@
     - idempotency
 
   pre_tasks:
+    - name: "blank variables"
+      set_fact:
+        iptables_apply__restored: ""
+        iptables_apply__ruleset: ""
+
     - name: "check the rule to append is there"
       iptables:
         chain: "{{ rule.chain | default('INPUT') }}"
@@ -515,7 +532,6 @@
     - name: "check for idempotency of all tasks"
       assert:
         that:
-          - iptables_state__registered is not changed
           - iptables_apply__restored is not changed
           - iptables_apply__ruleset is not changed
         quiet: yes
@@ -642,6 +658,11 @@
     - idempotency
 
   pre_tasks:
+    - name: "blank variables"
+      set_fact:
+        iptables_apply__restored: ""
+        iptables_apply__ruleset: ""
+
     - name: "check the rule to insert is there"
       iptables:
         chain: "{{ rule.chain | default('INPUT') }}"
@@ -664,7 +685,6 @@
     - name: "check for idempotency of all tasks"
       assert:
         that:
-          - iptables_state__registered is not changed
           - iptables_apply__restored is not changed
           - iptables_apply__ruleset is not changed
         quiet: yes

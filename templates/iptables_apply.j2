@@ -12,12 +12,12 @@
 {%- set core_rules = [
     'INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT',
     'INPUT -m conntrack --ctstate INVALID -j DROP',
-    'INPUT -i lo -m comment --comment "loopback" -j ACCEPT',
-    'INPUT -p icmp -m comment --comment "ICMP" -j ACCEPT',
-    'INPUT -p udp -m udp --sport :1023 -m comment --comment "bad source port" -j DROP',
-    'INPUT -p tcp -m tcp --sport :1023 -m comment --comment "bad source port" -j DROP',
-    'INPUT -p tcp -m tcp ! --syn -m comment --comment "bad NEWs" -j DROP',
-    'INPUT -p tcp -m tcp --dport %s -m comment --comment "SSH" -j ACCEPT' % (ansible_port | d(22)),
+    'INPUT -i lo -m comment --comment loopback -j ACCEPT',
+    'INPUT -p icmp -m comment --comment ICMP -j ACCEPT',
+    'INPUT -p udp -m udp --sport 0:1023 -m comment --comment "bad source port" -j DROP',
+    'INPUT -p tcp -m tcp --sport 0:1023 -m comment --comment "bad source port" -j DROP',
+    'INPUT -p tcp -m tcp ! --tcp-flags FIN,SYN,RST,ACK SYN -m comment --comment "bad NEWs" -j DROP',
+    'INPUT -p tcp -m tcp --dport %s -m comment --comment SSH -j ACCEPT' % (ansible_port | d(22)),
     'OUTPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT',
     'OUTPUT -m conntrack --ctstate INVALID -j DROP'
     ] %}

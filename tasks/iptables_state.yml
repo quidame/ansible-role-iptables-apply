@@ -9,6 +9,7 @@
     counters:   "{{ iptables_state__counters   | d(omit) }}"
     modprobe:   "{{ iptables_state__modprobe   | d(omit) }}"
     ip_version: "{{ iptables_state__ip_version | d(omit) }}"
+  #throttle: 1
   async: "{{ (iptables_state__state | d() == 'restored') | ternary(ansible_timeout, omit) }}"
   poll:  "{{ (iptables_state__state | d() == 'restored') | ternary(0, omit) }}"
   register: iptables_state__registered
