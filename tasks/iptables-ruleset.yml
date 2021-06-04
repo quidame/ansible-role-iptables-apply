@@ -5,6 +5,7 @@
     path: "{{ iptables_apply__path_buffer }}"
     state: saved
     table: filter
+  register: iptables_state__registered
 
 
 # The regexp being the same, a same task may be used to `append`, `insert` or
@@ -20,18 +21,26 @@
     # destination port(s) OR its comment, all other parameters remaining
     # unchanged.
     regexp: "^(-A {{
-      iptables_apply_item.chain | d('INPUT') }} -p {{
+      iptables_apply_item.chain | d('INPUT') }}( -s {{ '.*' if
+      iptables_apply_item.saddr is undefined else
+      iptables_apply_item.saddr if
+      iptables_apply_item.saddr is search('/') else '%s/32' %
+      iptables_apply_item.saddr }})? -p {{
       iptables_apply_item.protocol | d('tcp') }} -m (multiport|{{
       iptables_apply_item.protocol | d('tcp') }}) --dports? (({{
       iptables_apply_item.dport }} -m comment --comment .*)|(.* -m comment --comment (\"?){{
-      iptables_apply_item.name }}\\6)) -j {{
+      iptables_apply_item.name }}\\7)) -j {{
       iptables_apply_item.jump | d('ACCEPT') }})$"
     # The build `iptables_apply_item.name|replace('-','_')|wordcount` allows
     # our task to mimic iptables command behaviour regarding double quotes
     # enclosures. 'wordcount' filter alone fails idempotency for names such
     # as `foo-bar`, since `-` is a word separator for jinja2, not for iptables.
     line: "-A {{
-      iptables_apply_item.chain | d('INPUT') }} -p {{
+      iptables_apply_item.chain | d('INPUT') }}{{ '' if
+      iptables_apply_item.saddr is undefined else ' -s %s' %
+      iptables_apply_item.saddr if
+      iptables_apply_item.saddr is search('/') else ' -s %s/32' %
+      iptables_apply_item.saddr }} -p {{
       iptables_apply_item.protocol | d('tcp') }} -m {{ 'multiport --dports %s' %
       iptables_apply_item.dport if ',' in
       iptables_apply_item.dport | string else '%s --dport %s' % (
